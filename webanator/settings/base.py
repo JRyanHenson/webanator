@@ -23,7 +23,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 # SECRET_KEY REMOVED
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+
 
 
 # Application definition
@@ -109,9 +109,9 @@ USE_L10N = True
 USE_TZ = True
 
 
-AUTH_USER_MODEL = 'accounts.User'
-LOGOUT_REDIRECT_URL = '/'
-LOGIN_REDIRECT_URL = '/'
+# AUTH_USER_MODEL = 'accounts.User'
+# LOGOUT_REDIRECT_URL = '/'
+# LOGIN_REDIRECT_URL = '/'
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/1.11/howto/static-files/
