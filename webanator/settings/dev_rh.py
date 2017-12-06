@@ -27,19 +27,20 @@ SECRET_KEY = 'hgbdo-qw6-pc6=*m6bcis4%icxla5bv9vw$g@i)v042d_+ik1d'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
 
 INSTALLED_APPS = (
+    'accounts',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.admin',
-    'accounts',
+
 )
 
 MIDDLEWARE_CLASSES = (
@@ -103,9 +104,9 @@ USE_L10N = True
 USE_TZ = True
 
 
-LOGIN_REDIRECT_URL = reverse_lazy('dashboard')
-LOGIN_URL = reverse_lazy('login')
-LOGOUT_URL = reverse_lazy('logout')
+LOGIN_REDIRECT_URL = reverse_lazy('accounts:dashboard')
+LOGIN_URL = reverse_lazy('accounts:login')
+LOGOUT_URL = reverse_lazy('accounts:logout')
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/1.8/howto/static-files/
