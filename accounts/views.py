@@ -4,8 +4,6 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .forms import LoginForm, UserRegistrationForm, UserEditForm
-from .models import Profile
-
 
 def user_login(request):
     if request.method == 'POST':
@@ -38,7 +36,6 @@ def register(request):
             # Save the User object
             new_user.save()
             # Create the user profile
-            profile = Profile.objects.create(user=new_user)
             return render(request,
                           'account/register_done.html',
                           {'new_user': new_user})
@@ -52,20 +49,14 @@ def edit(request):
     if request.method == 'POST':
         user_form = UserEditForm(instance=request.user,
                                  data=request.POST)
-        profile_form = ProfileEditForm(instance=request.user.profile,
-                                       data=request.POST,
-                                       files=request.FILES)
-        if user_form.is_valid() and profile_form.is_valid():
+        if user_form.is_valid():
             user_form.save()
-            profile_form.save()
             messages.success(request, 'Profile updated successfully')
         else:
             messages.error(request, 'Error updating your profile')
     else:
         user_form = UserEditForm(instance=request.user)
-        profile_form = ProfileEditForm(instance=request.user.profile)
-    return render(request, 'account/edit.html', {'user_form': user_form,
-                                                 'profile_form': profile_form})
+    return render(request, 'account/edit.html', {'user_form': user_form})
 
 
 @login_required
