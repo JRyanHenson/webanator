@@ -15,6 +15,9 @@ class PointOfContact(models.Model):
 	email = models.EmailField(max_length=256)
 	phone = models.CharField(max_length=16)
 
+	def __str__(self):
+		return self.name
+
 	class Meta:
 		db_table = 'point_of_contact'
 
@@ -29,7 +32,7 @@ class PointOfContact(models.Model):
 
 class System(models.Model):
 	name = models.CharField(max_length=256)
-	update_date = models.DateTimeField()
+	update_date = models.DateTimeField(auto_now=True,null=True)
 	create_date = models.DateField(auto_now_add=True)
 	dod_component = models.CharField(max_length=8)
 	dod_it_resource_number = models.CharField(max_length=32)

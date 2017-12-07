@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}New System{% endblock %}
+
+{% block content %}
+    <h1>New Point of Contact</h1>
+    {% if form.errors %}
+        <p>There was an error creating your system</p>
+    {% endif %}
+    
+    <div class="">
+        <form action="{% url "poam:new-poc" %}" method="post">
+            {{ form.as_p }}
+            {% csrf_token %}
+            <p><input type="submit" value="Submit"></p>
+        </form>
+    </div>
+
+{% endblock %}
