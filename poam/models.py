@@ -39,6 +39,9 @@ class System(models.Model):
 	system_type = models.CharField(max_length=16)
 	point_of_contact = models.ForeignKey(PointOfContact, related_name="systems")
 
+	def __str__(self):
+		return self.name
+
 	class Meta:
 		db_table = 'system'
 
@@ -54,45 +57,59 @@ class System(models.Model):
 		'''Get system by system name'''
 		return self.objects.filter(name=system_name)
 
+	def get_systems(self):
+		'''Get all systems'''
+		return self.systems.all()
+
+
+class VulnId(models.Model):
+	vuln_id = models.CharField(max_length=8, unique=True)
+
+	class Meta:
+		db_table = 'vuln_id'
+
 
 class Weakness(models.Model):
-	STATUS_CHOICES = (
-		('ao_accepted_risk', 'AO Accepted Risk'),
-		('closed', 'Closed'),
-		('ongoing', 'Ongoing')
-	)
+	# STATUS_CHOICES = (
+	# 	('ao_accepted_risk', 'AO Accepted Risk'),
+	# 	('closed', 'Closed'),
+	# 	('ongoing', 'Ongoing')
+	# )
 
-	RAW_SEVERITY_CHOICES = (
-		('1', 'I'),
-		('2', 'II'),
-		('3', 'III')
-	)
+	# RAW_SEVERITY_CHOICES = (
+	# 	('1', 'I'),
+	# 	('2', 'II'),
+	# 	('3', 'III')
+	# )
 
-	MITIGATED_SEVERITY_CHOICES = (
-		('null', ''),
-		('1', 'I'),
-		('2', 'II'),
-		('3', 'III')
-	)
+	# MITIGATED_SEVERITY_CHOICES = (
+	# 	('null', ''),
+	# 	('1', 'I'),
+	# 	('2', 'II'),
+	# 	('3', 'III')
+	# )
 
 	title = models.TextField()
 	description = models.TextField()
 	system = models.ForeignKey(System, related_name="weaknesses")
 	point_of_contact = models.ForeignKey(PointOfContact, related_name="weaknesses")
-	mitigation = models.TextField()
-	resources_required = models.CharField(max_length=16)
-	scheduled_completion_date = models.DateField()
-	milestone_changes = models.CharField(max_length=16)
-	status = models.CharField(max_length=32, choices=STATUS_CHOICES)
-	comments = models.TextField()
-	raw_severity = models.CharField(max_length=1, choices=RAW_SEVERITY_CHOICES)
-	mitigated_severity = models.CharField(max_length=4, choices=MITIGATED_SEVERITY_CHOICES)
-	source_identifying_date = models.DateField()
+	mitigation = models.TextField(blank=True, null=True)
+	resources_required = models.CharField(max_length=16, blank=True, null=True)
+	scheduled_completion_date = models.DateField(blank=True, null=True)
+	milestone_changes = models.CharField(max_length=16, blank=True, null=True)
+	status = models.CharField(max_length=32)
+	comments = models.TextField(blank=True, null=True)
+	raw_severity = models.CharField(max_length=8)
+	mitigated_severity = models.CharField(max_length=4, blank=True, null=True)
+	source_identifying_date = models.DateField(auto_now_add=True)
 	source_identifying_event = models.CharField(max_length=32)
 	source_identifying_tool = models.CharField(max_length=32)
-	vuln_id = models.CharField(max_length=16)
+	vuln_id = models.ForeignKey(VulnId, related_name="Weaknesses")
 	check_contents = models.TextField()
 	fix_text = models.TextField()
+
+	def __str__(self):
+		return self.title
 
 	class Meta:
 		db_table = 'weakness'
@@ -176,3 +193,18 @@ class DeviceWeakness(models.Model):
 	class Meta:
 		db_table = 'device_weakness'
 		unique_together = ('device', 'weakness')
+
+
+# class SystemWeakness(models.Model):
+# 	system = models.ForeignKey(System, related_name="weaknesses")
+# 	weakness = models.ForeignKey(Weakness, related_name="systems")
+#
+# 	class Meta:
+# 		db_table = 'system_weakness'
+# 		unique_together = ('system', 'weakness')
+
+
+class Document(models.Model):
+    description = models.CharField(max_length=255, blank=True)
+    document = models.FileField(upload_to='documents/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
