@@ -16,10 +16,24 @@ class NewPOCForm(ModelForm):
 		fields = "__all__"
 
 
-class DocumentModelForm(ModelForm):
+class WeaknessModelForm(ModelForm):
 
     class Meta:
         model = Weakness
+        fields = "__all__"
+
+
+class DeviceForm(ModelForm):
+
+    class Meta:
+        model = Device
+        fields = "__all__"
+
+
+class DeviceWeaknessForm(ModelForm):
+
+    class Meta:
+        model = DeviceWeakness
         fields = "__all__"
 
 
@@ -35,4 +49,4 @@ class DocumentForm(forms.Form, ModelForm):
 
     class Meta:
         model = Weakness
-        fields = ['system', 'point_of_contact', 'source_identifying_event', 'source_identifying_tool']
+        fields = ['system', 'point_of_contact', 'source_identifying_event', 'source_identifying_tool', 'source_identifying_date']
