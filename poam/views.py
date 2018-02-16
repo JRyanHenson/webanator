@@ -20,9 +20,14 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
 	model = Weakness
 	form_class = DocumentForm
 
+	def get(self, request, *args, **kwargs):
+		form = self.form_class(initial=self.initial, system=System.objects.get(id=self.kwargs['pk']))
+		return render(request, self.template_name, {'form': form})
+
 	def get_context_data(self, **kwargs):
 		context = super(UploadArtifactView, self).get_context_data(**kwargs)
-		context['system'] = System.objects.get(id=self.kwargs['pk'])
+		system = System.objects.get(id=self.kwargs['pk'])
+		context['system'] = system
 		return context
 
 	def form_valid(self, form):
@@ -109,22 +114,22 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
 				ip = root.findtext(".//tag[@name='host-ip']")
 				os = root.findtext(".//tag[@name='operating-system']")
 				credentialed_scan = root.findtext(".//tag[@name='Credentialed_Scan']")
-                # not all nessus files have an input for hostname statements below corrects possible exception by using netbios name or ip
-                # if hostname is None:
-                #     hostname = root.findtext(".//tag[@name='netbios-name']")
-                # if hostname is None:
-                #     hostname = ip
-                # check to see if device object exists. if so, updates os and ip in existing device object
+				# not all nessus files have an input for hostname statements below corrects possible exception by using netbios name or ip
+				# if hostname is None:
+				#     hostname = root.findtext(".//tag[@name='netbios-name']")
+				# if hostname is None:
+				#     hostname = ip
+				# check to see if device object exists. if so, updates os and ip in existing device object
 				if Device.objects.filter(system=system.id, name=device).exists():
 					Device.objects.filter(system=system.id, name=device).update(os=os, ip=ip)
 					device = Device.objects.get(name=device)
-                # if device doesn't exists, creates new object using data dictionary file
+				# if device doesn't exists, creates new object using data dictionary file
 				else:
 					device_data_dict = {'name' : device, 'ip' : ip, 'os' : os, 'system': system.id}
 					deviceform = DeviceForm(device_data_dict)
 					deviceform.save()
 					device = Device.objects.get(name=device)
-                # for loop of nessus xml file to get relevant weakness information
+				# for loop of nessus xml file to get relevant weakness information
 				for vuln in tree.iter('ReportItem'):
 					vuln_id = vuln.get('pluginID')
 					severity = vuln.get('severity')
@@ -150,22 +155,22 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
 					# checks to see if weakness object with this hostname and vuln id already exists. if so, it updates existing object
 					if Weakness.objects.filter(device=device.id, vuln_id=vuln_id).exists():
 						Weakness.objects.filter(device=device.id, vuln_id=vuln_id).update(raw_severity=severity,
-                            plugin_family=plugin_family, synopsis=synopsis, plugin_output=plugin_output,source_identifying_event=source_id, source_identifying_tool=source_tool,
-                            fix_text=fix_text, point_of_contact=PointOfContact.objects.get(name=poc), status=status, cvss_base_score=cvss_base_score,
-                            cvss_temporal_score=cvss_temporal_score, cvss_vector=cvss_vector, cvss_temporal_vector=cvss_temporal_vector, exploit_available=exploit_available,
-                            credentialed_scan=credentialed_scan)
+							plugin_family=plugin_family, synopsis=synopsis, plugin_output=plugin_output,source_identifying_event=source_id, source_identifying_tool=source_tool,
+							fix_text=fix_text, point_of_contact=PointOfContact.objects.get(name=poc), status=status, cvss_base_score=cvss_base_score,
+							cvss_temporal_score=cvss_temporal_score, cvss_vector=cvss_vector, cvss_temporal_vector=cvss_temporal_vector, exploit_available=exploit_available,
+							credentialed_scan=credentialed_scan)
 					else:
 						# if severity is not 0 then create and new weakness object using a data dictionary file
 						if severity != '0':
 							weakness_data_dict = {'title': title, 'system': system.id, 'description': description, 'status': status,
-                                         'raw_severity': severity, 'source_identifying_event': source_id, 'source_identifying_date' : source_date,
-                                         'source_identifying_tool': source_tool, 'vuln_id': vuln_id.id,
-                                         'fix_text': fix_text, 'device': hostname.id,
-                                         'point_of_contact': PointOfContact.objects.get(name=poc).id,
-                                         'plugin_family': plugin_family, 'plugin_output' : plugin_output,
-                                         'synopsis' : synopsis, 'credentialed_scan' : credentialed_scan,
-                                         'cvss_base_score' : cvss_base_score, 'cvss_temporal_score' : cvss_temporal_score,
-                                         'cvss_temporal_vector' : cvss_temporal_vector, 'cvss_vector' : cvss_vector, 'exploit_available' : exploit_available}
+										 'raw_severity': severity, 'source_identifying_event': source_id, 'source_identifying_date' : source_date,
+										 'source_identifying_tool': source_tool, 'vuln_id': vuln_id.id,
+										 'fix_text': fix_text, 'device': hostname.id,
+										 'point_of_contact': PointOfContact.objects.get(name=poc).id,
+										 'plugin_family': plugin_family, 'plugin_output' : plugin_output,
+										 'synopsis' : synopsis, 'credentialed_scan' : credentialed_scan,
+										 'cvss_base_score' : cvss_base_score, 'cvss_temporal_score' : cvss_temporal_score,
+										 'cvss_temporal_vector' : cvss_temporal_vector, 'cvss_vector' : cvss_vector, 'exploit_available' : exploit_available}
 							weaknessform = WeaknessModelForm(weakness_data_dict)
 							weaknessform.save()
 							# checks for weakness objects created before the date of the current upload. if date is different,
@@ -189,19 +194,19 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
 
 
 class NewSystemView(LoginRequiredMixin, generic.CreateView):
-    template_name= 'poam/new_system.html'
-    model = System
-    form_class = NewSystemForm
+	template_name= 'poam/new_system.html'
+	model = System
+	form_class = NewSystemForm
 
-    def form_valid(self, form):
-        self.object=form.save()
-        return redirect(reverse("poam:upload-artifact"))
+	def form_valid(self, form):
+		self.object=form.save()
+		return redirect(reverse("poam:upload-artifact"))
 
 
 class NewPOCView(LoginRequiredMixin, generic.CreateView):
-    template_name = 'poam/new_poc.html'
-    model = PointOfContact
-    form_class = NewPOCForm
+	template_name = 'poam/new_poc.html'
+	model = PointOfContact
+	form_class = NewPOCForm
 
 	def form_valid(self, form):
 		self.object=form.save()
