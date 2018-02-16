@@ -189,19 +189,19 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
 
 
 class NewSystemView(LoginRequiredMixin, generic.CreateView):
-	template_name= 'poam/new_system.html'
-	model = System
-	form_class = NewSystemForm
+    template_name= 'poam/new_system.html'
+    model = System
+    form_class = NewSystemForm
 
-	def form_valid(self, form):
-		self.object=form.save()
-		return redirect(reverse("poam:upload-artifact"))
+    def form_valid(self, form):
+        self.object=form.save()
+        return redirect(reverse("poam:upload-artifact"))
 
 
 class NewPOCView(LoginRequiredMixin, generic.CreateView):
-	template_name = 'poam/new_poc.html'
-	model = PointOfContact
-	form_class = NewPOCForm
+    template_name = 'poam/new_poc.html'
+    model = PointOfContact
+    form_class = NewPOCForm
 
 	def form_valid(self, form):
 		self.object=form.save()
