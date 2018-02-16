@@ -45,9 +45,6 @@ class System(models.Model):
 	class Meta:
 		db_table = 'system'
 
-    class Meta:
-        db_table = 'system'
-
     def get_weaknesses(self):
         '''Gets the weaknesses of a specific system'''
         return self.weaknesses.all()
@@ -90,13 +87,6 @@ class Device(models.Model):
 	def get_systems(self):
 		'''Get all systems'''
 		return self.systems.all()
-
-
-class VulnId(models.Model):
-	vuln_id = models.CharField(max_length=8, unique=True)
-
-	class Meta:
-		db_table = 'vuln_id'
 
 
 class Weakness(models.Model):
@@ -172,19 +162,6 @@ class Weakness(models.Model):
     def get_weakness_by_source_identifying_date(self, date):
         '''Get weaknesses by source identifying date'''
         return self.objects.filter(source_identifying_date=date)
-
-
-class Device(models.Model):
-	name = models.CharField(max_length=32)
-	os = models.CharField(max_length=128, blank=True, null=True)
-	hardware = models.CharField(max_length=32)
-	software = models.CharField(max_length=32)
-	system = models.ForeignKey(System, related_name="devices")
-	ip = models.CharField(max_length=32)
-
-	class Meta:
-		db_table = 'device'
-		unique_together = ('name', 'system')
 
 
 class WeaknessSecurityControl(models.Model):
