@@ -31,7 +31,7 @@ class PointOfContact(models.Model):
 
 
 class System(models.Model):
-    name = models.CharField(max_length=256)
+    name = models.CharField(unique=True, max_length=256)
     update_date = models.DateTimeField(auto_now=True, null=True)
     create_date = models.DateField(auto_now_add=True)
     dod_component = models.CharField(max_length=8)
@@ -69,10 +69,27 @@ class VulnId(models.Model):
         db_table = 'vuln_id'
 
 
+class Device(models.Model):
+    name = models.CharField(max_length=64)
+    os = models.CharField(max_length=128, blank=True, null=True)
+    hardware = models.CharField(max_length=64, blank=True, null=True)
+    software = models.CharField(max_length=64, blank=True, null=True)
+    system = models.ForeignKey(System, related_name="devices")
+    ip = models.CharField(max_length=32, blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = 'device'
+        unique_together = ('name', 'system')
+
+
 class Weakness(models.Model):
     title = models.TextField()
     description = models.TextField()
     system = models.ForeignKey(System, related_name="weaknesses")
+    device = models.ForeignKey(Device, related_name="weaknesses")
     point_of_contact = models.ForeignKey(PointOfContact, related_name="weaknesses")
     mitigation = models.TextField(blank=True, null=True)
     resources_required = models.CharField(max_length=16, blank=True, null=True)
@@ -96,7 +113,7 @@ class Weakness(models.Model):
     cvss_temporal_score = models.TextField(blank=True, null=True)
     cvss_vector = models.TextField(blank=True, null=True)
     cvss_temporal_vector = models.TextField(blank=True, null=True)
-    exploit_available = models.TextField(blank=True, null=True)
+    exploit_available = models.TextField(blank=True, null=True) #Maybe make boolean
 
     def __str__(self):
         return self.title
@@ -124,57 +141,44 @@ class Weakness(models.Model):
         return self.objects.filter(status=status)
 
 
-def get_weakness_by_raw_severity(self, raw_severity):
-    '''Get weaknesses by raw severity'''
-    return self.objects.filter(raw_severity=raw_severity)
+    def get_weakness_by_raw_severity(self, raw_severity):
+        '''Get weaknesses by raw severity'''
+        return self.objects.filter(raw_severity=raw_severity)
 
 
-def get_weakness_by_mitigated_severity(self, mitigated_severity):
-    '''Get weaknesses by mitigated severity'''
-    return self.objects.filter(mitigated_severity=mitigated_severity)
+    def get_weakness_by_mitigated_severity(self, mitigated_severity):
+        '''Get weaknesses by mitigated severity'''
+        return self.objects.filter(mitigated_severity=mitigated_severity)
 
 
-def get_weakness_by_raw_severity(self, raw_severity):
-    '''Get weaknesses by raw severity'''
-    return self.objects.filter(raw_severity=raw_severity)
+    def get_weakness_by_raw_severity(self, raw_severity):
+        '''Get weaknesses by raw severity'''
+        return self.objects.filter(raw_severity=raw_severity)
 
 
-def get_weakness_by_source_identifying_date(self, date):
-    '''Get weaknesses by source identifying date'''
-    return self.objects.filter(source_identifying_date=date)
+    def get_weakness_by_source_identifying_date(self, date):
+        '''Get weaknesses by source identifying date'''
+        return self.objects.filter(source_identifying_date=date)
 
 
-def get_weakness_by_source_identifying_tool(self, tool):
-    '''Get weaknesses by source identifying tool'''
-    return self.objects.filter(source_identifying_tool=tool)
+    def get_weakness_by_source_identifying_tool(self, tool):
+        '''Get weaknesses by source identifying tool'''
+        return self.objects.filter(source_identifying_tool=tool)
 
 
-def get_weakness_by_source_identifying_event(self, event):
-    '''Get weaknesses by source identifying event'''
-    return self.objects.filter(source_identifying_event=event)
+    def get_weakness_by_source_identifying_event(self, event):
+        '''Get weaknesses by source identifying event'''
+        return self.objects.filter(source_identifying_event=event)
 
 
-def get_device(self):
-    '''Get weakness devices'''
-    return self.devices.device.name
+    def get_device(self):
+        '''Get weakness devices'''
+        return self.devices.device.name
 
 
-def get_security_control(self):
-    '''Get security control'''
-    return self.security_controls.security_control.title
-
-
-class Device(models.Model):
-    name = models.CharField(max_length=64)
-    os = models.CharField(max_length=128, blank=True, null=True)
-    hardware = models.CharField(max_length=64, blank=True, null=True)
-    software = models.CharField(max_length=64, blank=True, null=True)
-    system = models.ForeignKey(System, related_name="devices")
-    ip = models.CharField(max_length=32, blank=True, null=True)
-
-    class Meta:
-        db_table = 'device'
-        unique_together = ('name', 'system')
+    def get_security_control(self):
+        '''Get security control'''
+        return self.security_controls.security_control.title
 
 
 class WeaknessSecurityControl(models.Model):
@@ -186,14 +190,14 @@ class WeaknessSecurityControl(models.Model):
         unique_together = ('security_control', 'weakness')
 
 
-class DeviceWeakness(models.Model):
-    device = models.ForeignKey(Device, related_name="weaknesses")
-    weakness = models.ForeignKey(Weakness, related_name="devices")
-
-
-    class Meta:
-        db_table = 'device_weakness'
-        unique_together = ('device', 'weakness')
+# class DeviceWeakness(models.Model):
+#     device = models.ForeignKey(Device, related_name="weaknesses")
+#     weakness = models.ForeignKey(Weakness, related_name="devices")
+#
+#
+#     class Meta:
+#         db_table = 'device_weakness'
+#         unique_together = ('device', 'weakness')
 
 
 class Document(models.Model):
