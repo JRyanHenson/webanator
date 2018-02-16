@@ -1,20 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}New System{% endblock %}
+{% block title %}Upload Artifact{% endblock %}
 
 {% block content %}
-    <h1>Uplaod Artifact</h1>
+    <h1>Upload Artifact</h1>
     {% if form.errors %}
         <p>There was an error creating your system</p>
     {% endif %}
-    
+
+	<h3>System: {{ system.name }}</h3>
     <div class="">
-        <form action="{% url "poam:new-system" %}" method="post">
+
+         <form method="post" enctype="multipart/form-data">
             {{ form.as_p }}
             {% csrf_token %}
-            <p><a href="{% url "poam:new-poc" %}">Create a new Point of Contact</a></p>
-            <p><input type="submit" value="Submit"></p>
-        </form>
+        <button type="submit">Upload</button>
+         </form>
 
     </div>
 
