@@ -10,9 +10,9 @@ MANAGERS = [('Admin', 'admin@colonellevels.net')]
 
 
 IGNORABLE_404_URLS = [
-	re.compile(r'^/apple-touch-icon.*\.png$'),
-	re.compile(r'^/favicon\.ico$'),
-	re.compile(r'^/robots\.txt$')
+    re.compile(r'^/apple-touch-icon.*\.png$'),
+    re.compile(r'^/favicon\.ico$'),
+    re.compile(r'^/robots\.txt$')
 ]
 
 
@@ -21,9 +21,9 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME':os.environ['DB_NAME'],
-		'USER': os.environ['DB_USER'],
-		'PASSWORD': os.environ['DB_PASS'],
-		'HOST': os.environ['DB_HOST'],
-		'PORT': os.environ['DB_PORT'],
+        'USER': os.environ['DB_USER'],
+        'PASSWORD': os.environ['DB_PASS'],
+        'HOST': os.environ['DB_HOST'],
+        'PORT': os.environ['DB_PORT'],
     }
 }

@@ -5,7 +5,7 @@
 {% block content %}
     <h1>Edit {{ system.name }} System</h1>
 
-	<a href="{% url "poam:upload-artifact" system.id %}">Upload Artifacts</a><br>
+	<a href="{% url 'poam:upload-artifact' system.id %}">Upload Artifacts</a><br>
 	<a href="{% url 'poam:add-device' system.id %}">Add Device</a>
 
 {% endblock %}
