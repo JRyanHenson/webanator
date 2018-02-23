@@ -3,11 +3,13 @@ from django.db import models
 
 # Create your models here.
 class SecurityControl(models.Model):
+    control_number = models.CharField(max_length=16, unique=True)
     description = models.TextField()
-    title = models.CharField(max_length=256)
+    title = models.CharField(max_length=256, unique=True)
 
     class Meta:
         db_table = 'security_control'
+        unique_together = ('control_number', 'title')
 
 
 class PointOfContact(models.Model):
@@ -118,6 +120,7 @@ class Weakness(models.Model):
     cvss_temporal_vector = models.TextField(blank=True, null=True)
     exploit_available = models.TextField(blank=True, null=True)
     devices = models.ManyToManyField(Device, through="DeviceWeakness")
+    security_control = models.ManyToManyField(SecurityControl, through="WeaknessSecurityControl", blank=True)
 
     def __str__(self):
         return self.title

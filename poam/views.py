@@ -18,14 +18,14 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
     form_class = DocumentForm
 
     def get(self, request, *args, **kwargs):
-        form = self.form_class(initial=self.initial, system=System.objects.get(id=self.kwargs['pk']))
-        return render(request, self.template_name, {'form': form})
-
-    def get_context_data(self, **kwargs):
-        context = super(UploadArtifactView, self).get_context_data(**kwargs)
         system = System.objects.get(id=self.kwargs['pk'])
-        context['system'] = system
-        return context
+        form = self.form_class(initial=self.initial, system=system)
+        return render(request, self.template_name, {'form': form, 'system': system})
+
+    def get_form_kwargs(self):
+        kwargs = super(UploadArtifactView, self).get_form_kwargs()
+        kwargs['system'] = System.objects.get(id=self.kwargs['pk'])
+        return kwargs
 
     def form_valid(self, form):
         data = form.cleaned_data['file']
@@ -35,6 +35,8 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
         system = System.objects.get(id=self.kwargs['pk'])
         poc = form.cleaned_data['point_of_contact']
         file_type = form.cleaned_data['file_type']
+        device = form.cleaned_data['devices']
+        print(source_date)
 
         # read and parse the file, create a Python dictionary `data_dict` from it
         # start loop here for each Vuln_num in xml upload get Rule_title, Vuln_discuss,
@@ -47,20 +49,16 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                 for vuln in root.findall('.//VULN'):
                     status = vuln.find('STATUS').text
                     comments = vuln.find('COMMENTS').text
-                    vuln_id = vuln[0][1].text
                     severity = vuln[1][1].text
                     title = vuln[5][1].text
                     description = vuln[6][1].text
-                    # ia_control = vuln[7][1].text
                     chk_content = vuln[8][1].text
                     fix_text = vuln[9][1].text
                     try:
-                        vuln_id = VulnId(vuln_id=vuln_id)
+                        vuln_id = VulnId(vuln_id=vuln[0][1].text)
                         vuln_id.save()
                     except IntegrityError:
-                        vuln_id = vuln[0][1].text
-                        vuln_id = VulnId.objects.get(vuln_id=vuln_id)
-                    print(vuln_id.vuln_id)
+                        vuln_id = VulnId.objects.get(vuln_id=vuln[0][1].text)
                     if Weakness.objects.filter(system=system, vuln_id=vuln_id).exists():
                         Weakness.objects.filter(system=system, vuln_id=vuln_id).update(comments=comments,
                         raw_severity=severity, source_identifying_event=source_id,
@@ -68,13 +66,24 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                         point_of_contact=PointOfContact.objects.get(name=poc), status=status)
                     else:
                         if status == 'Open':
-                            data_dict = {'title': title, 'description': description, 'status': status, 'comments': comments,
-                                         'raw_severity': severity, 'source_identifying_event': source_id,
-                                         'source_identifying_tool': source_tool, 'vuln_id': vuln_id.id, 'check_contents': chk_content,
-                                         'fix_text': fix_text, 'system': system.id,
-                                         'point_of_contact': PointOfContact.objects.get(name=poc).id}
+                            data_dict = {'title': title, 'description': description, 'status': status,
+                                         'comments': comments, 'raw_severity': severity, 'source_identifying_event': source_id,
+                                         'source_identifying_tool': source_tool, 'source_identifying_date' : source_date, 'vuln_id': vuln_id.id,
+                                         'check_contents': chk_content, 'fix_text': fix_text, 'system': system.id,
+                                         'point_of_contact': PointOfContact.objects.get(name=poc).id, 'devices': device}
+                            if vuln[7][1].text is not None:
+                                try:
+                                    ia_control = SecurityControl(control_number=vuln[7][1].text, title='',
+                                                                 description='')
+                                    ia_control.save()
+                                except IntegrityError:
+                                    ia_control = SecurityControl.objects.get(control_number=vuln[7][1].text)
+                                data_dict['security_control'] = ia_control
                             form = WeaknessModelForm(data_dict)
-                            form.save()
+                            try:
+                                form.save()
+                            except:
+                                messages.error(self.request, '{} had error when saving to database. {}'.format(vuln_id.vuln_id, form.errors))
                         else:
                             continue
             else:
@@ -92,11 +101,12 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                     title = sheet['C{}'.format(row)].value
                     status = sheet['D{}'.format(row)].value
                     comments = sheet['E{}'.format(row)].value
+                    control_number = sheet['B{}'.format(row)].value
                     description = ''
-                    security_control = SecurityControl(title=title, description=description)
+                    security_control = SecurityControl(title=title, control_number=control_number, description=description)
                     security_control.save()
                     if status == 'Planned':
-                        weakness = Weakness(title=title, description=description, status=status, comments=comments, source_identifying_event=source_id, source_identifying_tool=source_tool, system=System.objects.get(name=system).id, point_of_contact=PointOfContact.objects.get(name=poc).id)
+                        weakness = Weakness(title=title, description=description, status=status, comments=comments, source_identifying_event=source_id, source_identifying_tool=source_tool, source_identifying_date=source_date,system=System.objects.get(name=system), point_of_contact=PointOfContact.objects.get(name=poc))
                         weakness.save()
                         WeaknessSecurityControl(security_control=security_control, weakness=weakness).save()
                         # data_dict = {'title': title, 'description': description, 'status': status, 'comments': comments, 'source_identifying_event': source_id, 'source_identifying_tool': source_tool, 'system': System.objects.get(name=system).id, 'point_of_contact': PointOfContact.objects.get(name=poc).id}
@@ -189,7 +199,7 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
             Weakness.objects.exclude(system=system, source_identifying_date=source_date).update(status='closed')
 
         messages.success(self.request, 'Artifacts Uploaded Successfully!')
-        return redirect(reverse('accounts:dashboard'))
+        return redirect(reverse('poam:edit-system', kwargs={'pk': self.kwargs['pk']}))
 
 
 class NewSystemView(LoginRequiredMixin, generic.CreateView):
