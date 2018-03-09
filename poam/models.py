@@ -5,7 +5,7 @@ from django.db import models
 class SecurityControl(models.Model):
     control_number = models.CharField(max_length=16, unique=True)
     description = models.TextField()
-    title = models.CharField(max_length=256, unique=True)
+    title = models.CharField(max_length=256)
 
     class Meta:
         db_table = 'security_control'
@@ -75,7 +75,7 @@ class Device(models.Model):
     name = models.CharField(max_length=64)
     os = models.CharField(max_length=128, blank=True, null=True)
     hardware = models.CharField(max_length=64, blank=True, null=True)
-    software = models.CharField(max_length=64, blank=True, null=True)
+    software = models.CharField(max_length=64, blank=True, null=True) # maybe take out
     system = models.ForeignKey(System, related_name="devices")
     ip = models.CharField(max_length=32, blank=True, null=True)
 
@@ -93,7 +93,7 @@ class Device(models.Model):
 
 class Weakness(models.Model):
     title = models.TextField()
-    description = models.TextField()
+    description = models.TextField(blank=True)
     system = models.ForeignKey(System, related_name="weaknesses")
     point_of_contact = models.ForeignKey(PointOfContact, related_name="weaknesses")
     mitigation = models.TextField(blank=True, null=True)
@@ -102,12 +102,12 @@ class Weakness(models.Model):
     milestone_changes = models.CharField(max_length=16, blank=True, null=True)
     status = models.CharField(max_length=32)
     comments = models.TextField(blank=True, null=True)
-    raw_severity = models.CharField(max_length=8)
+    raw_severity = models.CharField(max_length=8, blank=True)
     mitigated_severity = models.CharField(max_length=4, blank=True, null=True)
     source_identifying_date = models.DateField(auto_now=False)
     source_identifying_event = models.CharField(max_length=32)
     source_identifying_tool = models.CharField(max_length=32)
-    vuln_id = models.ForeignKey(VulnId, related_name="weaknesses")
+    vuln_id = models.ForeignKey(VulnId, related_name="weaknesses", null=True, blank=True)
     check_contents = models.TextField(blank=True, null=True)
     fix_text = models.TextField(blank=True, null=True)
     plugin_family = models.TextField(blank=True, null=True)
@@ -119,8 +119,8 @@ class Weakness(models.Model):
     cvss_vector = models.TextField(blank=True, null=True)
     cvss_temporal_vector = models.TextField(blank=True, null=True)
     exploit_available = models.TextField(blank=True, null=True)
-    devices = models.ManyToManyField(Device, through="DeviceWeakness")
-    security_control = models.ManyToManyField(SecurityControl, through="WeaknessSecurityControl", blank=True)
+    devices = models.ManyToManyField(Device, blank=True)
+    security_control = models.ManyToManyField(SecurityControl, blank=True)
 
     def __str__(self):
         return self.title
@@ -147,44 +147,21 @@ class Weakness(models.Model):
         '''Get weaknesses by status'''
         return self.objects.filter(status=status)
 
-
     def get_weakness_by_raw_severity(self, raw_severity):
         '''Get weaknesses by raw severity'''
         return self.objects.filter(raw_severity=raw_severity)
-
 
     def get_weakness_by_mitigated_severity(self, mitigated_severity):
         '''Get weaknesses by mitigated severity'''
         return self.objects.filter(mitigated_severity=mitigated_severity)
 
-
     def get_weakness_by_raw_severity(self, raw_severity):
         '''Get weaknesses by raw severity'''
         return self.objects.filter(raw_severity=raw_severity)
 
-
     def get_weakness_by_source_identifying_date(self, date):
         '''Get weaknesses by source identifying date'''
         return self.objects.filter(source_identifying_date=date)
-
-
-class WeaknessSecurityControl(models.Model):
-    security_control = models.ForeignKey(SecurityControl, related_name="weaknesses")
-    weakness = models.ForeignKey(Weakness, related_name="security_controls")
-
-    class Meta:
-        db_table = 'weakness_security_control'
-        unique_together = ('security_control', 'weakness')
-
-
-class DeviceWeakness(models.Model):
-    device = models.ForeignKey(Device, related_name="weaknesses")
-    weakness = models.ForeignKey(Weakness, related_name="weakness_devices")
-
-
-    class Meta:
-        db_table = 'device_weakness'
-        unique_together = ('device', 'weakness')
 
 
 class Document(models.Model):
