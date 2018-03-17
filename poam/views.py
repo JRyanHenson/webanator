@@ -1,11 +1,15 @@
 from django.shortcuts import render, redirect, reverse
 from django.views import generic
+from django.http import HttpResponse
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.conf import settings
 from xml.etree import ElementTree
 from django.db import IntegrityError
 
 import openpyxl
+import datetime
+import os
 
 from .forms import *
 from .models import *
@@ -65,7 +69,7 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                         point_of_contact=PointOfContact.objects.get(name=poc), status=status)
                     else:
                         if status == 'Open':
-                            weakness = Weakness.objects.create(title=title, description=description, status=status, comments=comments, raw_severity=severity, source_identifying_event=source_id, source_identifying_tool=source_tool, source_identifying_date=source_date, vuln_id=vuln_id, check_contents=chk_content, fix_text=fix_text, system=system, point_of_contact=PointOfContact.objects.get(name=poc))
+                            # weakness = Weakness.objects.create(title=title, description=description, status=status, comments=comments, raw_severity=severity, source_identifying_event=source_id, source_identifying_tool=source_tool, source_identifying_date=source_date, vuln_id=vuln_id, check_contents=chk_content, fix_text=fix_text, system=system, point_of_contact=PointOfContact.objects.get(name=poc))
                             data_dict = {'title': title, 'description': description, 'status': status,
                                          'comments': comments, 'raw_severity': severity, 'source_identifying_event': source_id,
                                          'source_identifying_tool': source_tool, 'source_identifying_date' : source_date, 'vuln_id': vuln_id.id,
@@ -76,14 +80,15 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                                     ia_control = SecurityControl(control_number=vuln[7][1].text, title='',
                                                                  description='')
                                     ia_control.save()
+                                    ia_control = SecurityControl.objects.filter(id=ia_control.id)
                                 except IntegrityError:
-                                    ia_control = SecurityControl.objects.get(control_number=vuln[7][1].text)
+                                    ia_control = SecurityControl.objects.filter(control_number=vuln[7][1].text)
                                 data_dict['security_control'] = ia_control
                             form = WeaknessModelForm(data_dict)
-                            form.save()
-                            # try:
-                            # except:
-                            #     messages.error(self.request, '{} had error when saving to database. {}'.format(vuln_id.vuln_id, form.errors))
+                            try:
+                                form.save()
+                            except:
+                                messages.error(self.request, '{} had error when saving to database. {}'.format(vuln_id.vuln_id, form.errors))
                         else:
                             continue
             else:
@@ -105,31 +110,21 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                     try:
                         security_control = SecurityControl(title=title, control_number=control_number, description='')
                         security_control.save()
+                        security_controls = SecurityControl.objects.filter(control_number=control_number)
                     except IntegrityError:
                         security_control = SecurityControl.objects.get(control_number=control_number)
-                    if status == 'Planned':
-                        weakness = Weakness.objects.create(title=title, description='', status=status, comments=comments, source_identifying_event=source_id, source_identifying_tool=source_tool, source_identifying_date=source_date, system=System.objects.get(name=system), point_of_contact=PointOfContact.objects.get(name=poc))
-                        for specific_device in device:
-                            device_weakness = DeviceWeakness(device=specific_device, weakness=weakness)
-                            device_weakness.save()
-                        security_control_weakness = WeaknessSecurityControl(security_control=security_control, weakness=weakness)
-                        security_control_weakness.save()
-                        # weakness = Weakness(title=title, description=description, status=status, comments=comments, source_identifying_event=source_id, source_identifying_tool=source_tool, source_identifying_date=source_date,system=System.objects.get(name=system), point_of_contact=PointOfContact.objects.get(name=poc), security_control=security_control)
-                        # weakness.save()
-                        # WeaknessSecurityControl(security_control=security_control, weakness=weakness).save()
-                        # data_dict = {'title': title, 'description': '', 'status': status, 'comments': comments, 'source_identifying_event': source_id, 'source_identifying_tool': source_tool, 'devices': device, 'security_control': security_control, 'source_identifying_date' : source_date, 'system': System.objects.get(name=system).id, 'point_of_contact': PointOfContact.objects.get(name=poc).id}
-                        # form = WeaknessModelForm(data_dict)
-                        # form.save()
-                        # print(data_dict)
-                        # for device in device:
-                        #     DeviceWeakness.objects.create(device=device, weakness=form.instance)
-                        # try:
-                        #     form.save()
-                        # except:
-                        #     print(control_number)
-                        #     print(form.errors)
-                        #     messages.error(self.request, form.errors)
-                        #     break
+                        security_controls = SecurityControl.objects.filter(control_number=control_number)
+
+                    if Weakness.objects.filter(title=title, security_control__id=security_control.id).exists():
+                        Weakness.objects.filter(title=title, security_control=security_controls).update(status=status, comments=comments, source_identifying_event=source_id, source_identifying_tool=source_tool, devices=device, security_control=security_controls, source_identifying_date=source_date, system=System.objects.get(name=system).id, point_of_contact=PointOfContact.objects.get(name=poc).id)
+                    else:
+                        if status == 'Planned':
+                            data_dict = {'title': title, 'description': '', 'status': status, 'comments': comments, 'source_identifying_event': source_id, 'source_identifying_tool': source_tool, 'devices': device, 'security_control': security_controls, 'source_identifying_date' : source_date, 'system': System.objects.get(name=system).id, 'point_of_contact': PointOfContact.objects.get(name=poc).id}
+                            form = WeaknessModelForm(data_dict)
+                            try:
+                                form.save()
+                            except:
+                                messages.error(self.request, form.errors)
         elif file_type == 'nessus_scan_file':
             # parse data from nessus file and define as tree then get the root of the xml file
             tree = ElementTree.parse(data)
@@ -153,6 +148,7 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                         specific_device = Device.objects.get(name=specific_device)
                     # if device doesn't exists, creates new object using data dictionary file
                     else:
+                        # throw error - work on for later
                         device_data_dict = {'name' : specific_device, 'ip' : ip, 'os' : os, 'system': system.id}
                         deviceform = DeviceForm(device_data_dict)
                         deviceform.save()
@@ -273,3 +269,72 @@ class AddDeviceView(LoginRequiredMixin, generic.CreateView):
         device.save()
         messages.success(self.request, 'Device Added Successfully!')
         return redirect(reverse('poam:edit-system', kwargs={'pk': self.kwargs['pk']}))
+
+
+class ExportSystemView(LoginRequiredMixin, generic.DetailView):
+    template_name = 'poam/edit-system.html'
+    model = System
+
+    def get(self, request, *args, **kwargs):
+        fp = openpyxl.load_workbook('{}/template.xlsx'.format(settings.MEDIA_ROOT))
+        ws = fp['POAM']
+
+        ws['B1'] = self.get_object().create_date
+        ws['B2'] = self.get_object().update_date
+        ws['B3'] = self.get_object().dod_component
+        ws['B4'] = self.get_object().name
+        ws['B5'] = self.get_object().dod_it_resource_number
+
+        ws['H1'] = self.get_object().system_type
+        ws['H3'] = self.get_object().point_of_contact.name
+        ws['H4'] = self.get_object().point_of_contact.phone
+        ws['H5'] = self.get_object().point_of_contact.email
+
+        poams = self.get_object().get_weaknesses()
+        row = 7
+        for poam in poams:
+            weakness = ''
+            if poam.vuln_id:
+                weakness += '{}\n'.format(poam.vuln_id.vuln_id)
+            weakness += 'Title:{}\n'.format(poam.title)
+            weakness += '\nDescription:{}'.format(poam.description)
+            weakness += '\n\nDevices Affected:\n'
+            for device in poam.devices.all():
+                weakness += '{}\n'.format(device.name)
+            ws['A{}'.format(row)] = weakness
+            ws['B{}'.format(row)] = poam.raw_severity
+            sc = ''
+            security_controls = poam.security_control.all()
+            for security_control in security_controls:
+                sc += '{}'.format(security_control.control_number)
+            ws['C{}'.format(row)] = sc
+            ws['D{}'.format(row)] = poam.mitigated_severity
+            ws['E{}'.format(row)] = poam.mitigation
+
+            poc = ''
+            poc += '{}\n'.format(poam.point_of_contact.name)
+            poc += '{}\n'.format(poam.point_of_contact.email)
+            poc += '{}\n'.format(poam.point_of_contact.phone)
+
+            ws['F{}'.format(row)] = poc
+            ws['G{}'.format(row)] = poam.resources_required
+            ws['H{}'.format(row)] = poam.scheduled_completion_date
+            ws['I{}'.format(row)] = poam.milestone_changes
+
+            source_identifying_weakness = ''
+            source_identifying_weakness += '1. {}\n'.format(poam.source_identifying_event)
+            source_identifying_weakness += '2. {}\n'.format(poam.source_identifying_tool)
+            source_identifying_weakness += '3. {}\n'.format(poam.source_identifying_date)
+
+            ws['J{}'.format(row)] = source_identifying_weakness
+            ws['K{}'.format(row)] = poam.status
+            ws['L{}'.format(row)] = poam.comments
+            row += 1
+
+        filename = '{}_{}.xlsx'.format(datetime.date.today(), self.get_object().name)
+        fp.save('{}/poam/{}'.format(settings.MEDIA_ROOT, filename))
+
+        fp = openpyxl.load_workbook('{}/poam/{}'.format(settings.MEDIA_ROOT, filename))
+        httpresponse = HttpResponse(openpyxl.writer.excel.save_virtual_workbook(fp), content_type='application/vnd.ms-excel')
+        httpresponse['Content-Disposition'] = 'attachment; filename={}'.format(filename)
+        return httpresponse

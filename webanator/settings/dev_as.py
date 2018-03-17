@@ -14,17 +14,17 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME':'webanatorDB',
-		'USER': 'postgres',
-		'PASSWORD': os.environ['DB_PASS'],
-		'HOST': 'localhost',
-		'PORT': '',
+        'USER': 'postgres',
+        'PASSWORD': os.environ['DB_PASS'],
+        'HOST': 'localhost',
+        'PORT': '',
     }
 }
 
 
 # Static and media files
 STATICFILES_DIRS = [
-	os.path.join(BASE_DIR, 'static')
+    os.path.join(BASE_DIR, 'static')
 ]
 
 STATIC_URL = '/static/'
