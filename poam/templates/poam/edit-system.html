@@ -5,8 +5,15 @@
 {% block content %}
     <h1>Edit {{ system.name }} System</h1>
 
+    <form class="" action="." method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Save</button>
+    </form>
+    <br>or<br><br>
+
     <a href="{% url 'poam:upload-artifact' system.id %}">Upload Artifacts</a><br>
     <a href="{% url 'poam:add-device' system.id %}">Add Device</a><br>
+    <a href="{% url 'poam:select-device' system.id %}">Edit Devices</a><br>
     <a href="{% url 'poam:export-system' system.id %}">Export System</a>
-
 {% endblock %}

@@ -9,13 +9,13 @@
     {% endif %}
 
     <div class="">
-
          <form method="post" enctype="multipart/form-data">
             {{ form.as_p }}
             {% csrf_token %}
-        <button type="submit">Upload</button>
+            <button type="submit">Upload</button>
          </form>
-
+         <br><br>
+         <a href="{% url 'poam:add-device' system.id %}">Device not listed?</a>
     </div>
 
 {% endblock %}

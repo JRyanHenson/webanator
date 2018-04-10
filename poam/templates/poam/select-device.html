@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Select System{% endblock %}
+
+{% block content %}
+    <h1>Select Device from {{ system.name }} System</h1>
+
+    <form action="." method="post">
+        {% csrf_token %}
+        <select name="device" required>
+            <option value=""selected disabled>Choose Device</option>
+            {% for device in devices %}
+                <option value="{{ device.id }}">{{ device.name }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit">Go</button>
+    </form>
+
+{#	<!-- <a href="{% url "poam:upload-artifact" %}">Upload Artifacts</a><br>#}
+{#	<a href="{% url 'poam:add-device' %}">Add Device</a> -->#}
+
+{% endblock %}

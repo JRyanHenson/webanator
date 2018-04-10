@@ -4,7 +4,7 @@ from .models import *
 
 
 # Create the form class.
-class NewSystemForm(ModelForm):
+class SystemForm(ModelForm):
 
     class Meta:
         model = System
@@ -25,7 +25,7 @@ class WeaknessModelForm(ModelForm):
         fields = "__all__"
 
 
-class AddDeviceForm(ModelForm):
+class DeviceForm(ModelForm):
 
     class Meta:
         model = Device

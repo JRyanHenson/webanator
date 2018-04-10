@@ -149,10 +149,8 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                     # if device doesn't exists, creates new object using data dictionary file
                     else:
                         # throw error - work on for later
-                        device_data_dict = {'name' : specific_device, 'ip' : ip, 'os' : os, 'system': system.id}
-                        deviceform = DeviceForm(device_data_dict)
-                        deviceform.save()
-                        specific_device = Device.objects.get(name=specific_device)
+                        messages.error(self.request, 'Woops! One of the devices is not in the database')
+                        break
                     # for loop of nessus xml file to get relevant weakness information
                     for vuln in tree.iter('ReportItem'):
                         vuln_id = vuln.get('pluginID')
@@ -220,7 +218,7 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
 class NewSystemView(LoginRequiredMixin, generic.CreateView):
     template_name= 'poam/new_system.html'
     model = System
-    form_class = NewSystemForm
+    form_class = SystemForm
 
     def form_valid(self, form):
         self.object=form.save()
@@ -248,15 +246,20 @@ class SelectSystemView(LoginRequiredMixin, generic.ListView):
         return redirect(reverse('poam:edit-system', kwargs={'pk': system}))
 
 
-class EditSystemView(LoginRequiredMixin, generic.DetailView):
+class EditSystemView(LoginRequiredMixin, generic.UpdateView):
     template_name = "poam/edit-system.html"
     model = System
+    form_class = SystemForm
+
+    def get_success_url(self):
+        url = reverse('poam:edit-system', kwargs={'pk': self.kwargs['pk']})
+        return url
 
 
 class AddDeviceView(LoginRequiredMixin, generic.CreateView):
     template_name = "poam/add-device.html"
     model = Device
-    form_class = AddDeviceForm
+    form_class = DeviceForm
 
     def get_context_data(self, **kwargs):
         context = super(AddDeviceView, self).get_context_data(**kwargs)
@@ -302,7 +305,18 @@ class ExportSystemView(LoginRequiredMixin, generic.DetailView):
             for device in poam.devices.all():
                 weakness += '{}\n'.format(device.name)
             ws['A{}'.format(row)] = weakness
-            ws['B{}'.format(row)] = poam.raw_severity
+
+            if poam.raw_severity.lower() == 'high' or poam.raw_severity.lower() == 'very high' or poam.raw_severity == '1':
+                raw_severity = 'I'
+            elif poam.raw_severity.lower() == 'medium' or poam.raw_severity == '2':
+                raw_severity = 'II'
+            elif poam.raw_severity.lower() == 'low' or poam.raw_severity == '3' or poam.raw_severity == '4':
+                raw_severity = 'III'
+            else:
+                raw_severity = poam.raw_severity
+
+            ws['B{}'.format(row)] = raw_severity
+
             sc = ''
             security_controls = poam.security_control.all()
             for security_control in security_controls:
@@ -338,3 +352,27 @@ class ExportSystemView(LoginRequiredMixin, generic.DetailView):
         httpresponse = HttpResponse(openpyxl.writer.excel.save_virtual_workbook(fp), content_type='application/vnd.ms-excel')
         httpresponse['Content-Disposition'] = 'attachment; filename={}'.format(filename)
         return httpresponse
+
+
+class SelectDeviceView(LoginRequiredMixin, generic.ListView):
+    template_name = 'poam/select-device.html'
+    model = Device
+    context_object_name = 'devices'
+
+    def get(self, request, *args, **kwargs):
+        system = System.objects.get(id=self.kwargs['pk'])
+        devices = system.devices.all()
+        return render(request, self.template_name, {'system': system, 'devices': devices})
+
+    def post(self, request, *args, **kwargs):
+        return redirect(reverse('poam:edit-device', kwargs={'pk': request.POST.get('device')}))
+
+
+class EditDeviceView(LoginRequiredMixin, generic.UpdateView):
+    template_name = 'poam/edit-device.html'
+    model = Device
+    form_class = DeviceForm
+
+    def get_success_url(self):
+        url = reverse('poam:edit-system', kwargs={'pk': Device.objects.get(id=self.kwargs['pk']).system.id})
+        return url
