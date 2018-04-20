@@ -52,9 +52,9 @@ class DocumentForm(forms.Form, ModelForm):
         model = Weakness
         fields = ['system', 'point_of_contact', 'source_identifying_event', 'source_identifying_tool', 'source_identifying_date', 'devices']
 
-        # widgets = {
-        #     'source_identifying_date' = forms.DateInput()
-        # }
+        widgets = {
+            'source_identifying_date': forms.DateInput(attrs={'type': 'date'}, format=('%Y-%m-%d'))
+        }
 
     def __init__(self, system, *args, **kwargs):
         super(DocumentForm, self).__init__(*args, **kwargs)
