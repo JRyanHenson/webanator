@@ -3,7 +3,7 @@ from django.db import models
 
 # Create your models here.
 class SecurityControl(models.Model):
-    control_number = models.CharField(max_length=16, unique=True)
+    control_number = models.CharField(max_length=32, unique=True)
     description = models.TextField()
     title = models.CharField(max_length=256)
 
