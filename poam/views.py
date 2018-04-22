@@ -139,7 +139,19 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                 # hostname = root.findtext(".//tag[@name='hostname']")
                 ip = root.findtext(".//tag[@name='host-ip']")
                 os = root.findtext(".//tag[@name='operating-system']")
+                hostname = root.findtext(".//tag[@name='hostname']")
+                netbios_name = root.findtext(".//tag[@name='netbios-name']")
+                mac = root.findtext(".//tag[@name='mac-address']")
+                bios_uid = root.findtext(".//tag[@name='bios-uuid']")
+                cpe = root.findtext(".//tag[@name='cpe']")
+                cpe0 = root.findtext(".//tag[@name='cpe-0']")
+                cpe1 = root.findtext(".//tag[@name='cpe-1']")
+                cpe2 = root.findtext(".//tag[@name='cpe-2']")
+                cpe3 = root.findtext(".//tag[@name='cpe-3']")
+                cpe4 = root.findtext(".//tag[@name='cpe-4']")
+                cpe5 = root.findtext(".//tag[@name='cpe-5']")
                 credentialed_scan = root.findtext(".//tag[@name='Credentialed_Scan']")
+
                 # not all nessus files have an input for hostname statements below corrects possible exception by using netbios name or ip
                 # if hostname is None:
                 #     hostname = root.findtext(".//tag[@name='netbios-name']")
@@ -151,7 +163,7 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                         messages.error(self.request, 'Woops! One of the devices is not in the database')
                         break
                     else:
-                        Device.objects.filter(system=system, name=specific_device).update(os=os, ip=ip)
+                        Device.objects.filter(system=system, name=specific_device).update(os=os, ip=ip, hostname=hostname, netbios_name=netbios_name, mac=mac, bios_uid=bios_uid)
                     # for loop of nessus xml file to get relevant weakness information
                     for vuln in tree.iter('ReportItem'):
                         vuln_id = vuln.get('pluginID')
@@ -167,7 +179,13 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                         cvss_temporal_score = vuln.findtext('cvss_temporal_score')
                         cvss_vector = vuln.findtext('cvss_vector')
                         cvss_temporal_vector = vuln.findtext('cvss_temporal_vector')
+                        cvss3_base_score = vuln.findtext('cvss3_base_score')
+                        cvss3_vector = vuln.findtext('cvss3_vector')
                         exploit_available = vuln.findtext('exploit_available')
+                        cpe = vuln.findtext('cpe')
+                        cve = vuln.findtext('cve')
+                        risk_factor = vuln.findtext('risk_factor')
+                        vuln_pub_date = vuln.findtext('vuln_publication_date')
                         # try block to test to see if vuln_id already exists in DB. if not, creates object
                         try:
                             vuln_id = VulnId(vuln_id=vuln_id)
@@ -180,7 +198,8 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                             Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).update(raw_severity=severity,
                                 plugin_family=plugin_family, synopsis=synopsis, plugin_output=plugin_output,source_identifying_event=source_id, source_identifying_tool=source_tool,
                                 fix_text=fix_text, point_of_contact=PointOfContact.objects.get(name=poc), status=status, cvss_base_score=cvss_base_score,
-                                cvss_temporal_score=cvss_temporal_score, cvss_vector=cvss_vector, cvss_temporal_vector=cvss_temporal_vector, exploit_available=exploit_available,
+                                cvss_temporal_score=cvss_temporal_score, cvss_vector=cvss_vector, cvss_temporal_vector=cvss_temporal_vector, cvss3_base_score=cvss3_base_score, cvss3_vector=cvss3_vector,
+                                cve=cve, risk_factor=risk_factor, vuln_pub_date=vuln_pub_date, exploit_available=exploit_available,
                                 credentialed_scan=credentialed_scan)
                         else:
                             # if severity is not 0 then create and new weakness object using a data dictionary file
@@ -192,8 +211,9 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                                              'point_of_contact': PointOfContact.objects.get(name=poc).id,
                                              'plugin_family': plugin_family, 'plugin_output' : plugin_output,
                                              'synopsis' : synopsis, 'credentialed_scan' : credentialed_scan,
-                                             'cvss_base_score' : cvss_base_score, 'cvss_temporal_score' : cvss_temporal_score,
-                                             'cvss_temporal_vector' : cvss_temporal_vector, 'cvss_vector' : cvss_vector, 'exploit_available' : exploit_available}
+                                             'cvss_base_score' : cvss_base_score, 'cvss_vector' : cvss_vector, 'cvss_temporal_score' : cvss_temporal_score, 'cvss_temporal_vector' : cvss_temporal_vector,
+                                             'cvss3_base_score' : cvss3_base_score, 'cvss3_vector' : cvss3_vector, 'exploit_available' : exploit_available, 'cve' : cve, 'risk_factor' : risk_factor,
+                                             'vuln_pub_date' : vuln_pub_date}
                                 weaknessform = WeaknessModelForm(weakness_data_dict)
                                 weaknessform.save()
                                 # checks for weakness objects created before the date of the current upload. if date is different,
