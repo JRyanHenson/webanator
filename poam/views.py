@@ -143,21 +143,9 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                 netbios_name = root.findtext(".//tag[@name='netbios-name']")
                 mac = root.findtext(".//tag[@name='mac-address']")
                 bios_uid = root.findtext(".//tag[@name='bios-uuid']")
-                cpe = root.findtext(".//tag[@name='cpe']")
-                cpe0 = root.findtext(".//tag[@name='cpe-0']")
-                cpe1 = root.findtext(".//tag[@name='cpe-1']")
-                cpe2 = root.findtext(".//tag[@name='cpe-2']")
-                cpe3 = root.findtext(".//tag[@name='cpe-3']")
-                cpe4 = root.findtext(".//tag[@name='cpe-4']")
-                cpe5 = root.findtext(".//tag[@name='cpe-5']")
+                cpe = [root.findtext(".//tag[@name='cpe']"), root.findtext(".//tag[@name='cpe-0']"), root.findtext(".//tag[@name='cpe-1']"), root.findtext(".//tag[@name='cpe-2']"), root.findtext(".//tag[@name='cpe-3']"), root.findtext(".//tag[@name='cpe-4']"), root.findtext(".//tag[@name='cpe-5']")]
                 credentialed_scan = root.findtext(".//tag[@name='Credentialed_Scan']")
 
-                # not all nessus files have an input for hostname statements below corrects possible exception by using netbios name or ip
-                # if hostname is None:
-                #     hostname = root.findtext(".//tag[@name='netbios-name']")
-                # if hostname is None:
-                #     hostname = ip
-                # check to see if device object exists. if so, updates os and ip in existing device object
                 for specific_device in device:
                     if not Device.objects.filter(system=system, name=specific_device).exists():
                         messages.error(self.request, 'Woops! One of the devices is not in the database')
@@ -182,7 +170,7 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                         cvss3_base_score = vuln.findtext('cvss3_base_score')
                         cvss3_vector = vuln.findtext('cvss3_vector')
                         exploit_available = vuln.findtext('exploit_available')
-                        cpe = vuln.findtext('cpe')
+                        cpe.append(vuln.findtext('cpe'))
                         cve = vuln.findtext('cve')
                         risk_factor = vuln.findtext('risk_factor')
                         vuln_pub_date = vuln.findtext('vuln_publication_date')
@@ -196,11 +184,20 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                         # checks to see if weakness object with this hostname and vuln id already exists. if so, it updates existing object
                         if Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).exists():
                             Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).update(raw_severity=severity,
-                                plugin_family=plugin_family, synopsis=synopsis, plugin_output=plugin_output,source_identifying_event=source_id, source_identifying_tool=source_tool,
-                                fix_text=fix_text, point_of_contact=PointOfContact.objects.get(name=poc), status=status, cvss_base_score=cvss_base_score,
-                                cvss_temporal_score=cvss_temporal_score, cvss_vector=cvss_vector, cvss_temporal_vector=cvss_temporal_vector, cvss3_base_score=cvss3_base_score, cvss3_vector=cvss3_vector,
-                                cve=cve, risk_factor=risk_factor, vuln_pub_date=vuln_pub_date, exploit_available=exploit_available,
-                                credentialed_scan=credentialed_scan)
+                             plugin_family=plugin_family, synopsis=synopsis, plugin_output=plugin_output,source_identifying_event=source_id, source_identifying_tool=source_tool,
+                             fix_text=fix_text, point_of_contact=PointOfContact.objects.get(name=poc), status=status, cvss_base_score=cvss_base_score,
+                             cvss_temporal_score=cvss_temporal_score, cvss_vector=cvss_vector, cvss_temporal_vector=cvss_temporal_vector, cvss3_base_score=cvss3_base_score, cvss3_vector=cvss3_vector,
+                             cve=cve, risk_factor=risk_factor, vuln_pub_date=vuln_pub_date, exploit_available=exploit_available,
+                             credentialed_scan=credentialed_scan)
+                            if cpe is not None:
+                                for cpe in cpe:
+                                   try:
+                                       cpe = CPE(cpe=cpe)
+                                       cpe.save()
+                                       cpe = CPE.objects.filter(id=cpe.id)
+                                   except IntegrityError:
+                                       cpe = CPE.objects.filter(cpe=cpe)
+                                   Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).update(cpe=cpe)
                         else:
                             # if severity is not 0 then create and new weakness object using a data dictionary file
                             if severity != '0':
@@ -214,15 +211,36 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                                              'cvss_base_score' : cvss_base_score, 'cvss_vector' : cvss_vector, 'cvss_temporal_score' : cvss_temporal_score, 'cvss_temporal_vector' : cvss_temporal_vector,
                                              'cvss3_base_score' : cvss3_base_score, 'cvss3_vector' : cvss3_vector, 'exploit_available' : exploit_available, 'cve' : cve, 'risk_factor' : risk_factor,
                                              'vuln_pub_date' : vuln_pub_date}
-                                weaknessform = WeaknessModelForm(weakness_data_dict)
-                                weaknessform.save()
+                                if cpe is not None:
+                                    for cpe in cpe:
+                                        try:
+                                            cpe = CPE(cpe=cpe)
+                                            cpe.save()
+                                            cpe = CPE.objects.filter(id=cpe.id)
+                                        except IntegrityError:
+                                            cpe = CPE.objects.filter(cpe=cpe)
+                                        weakness_data_dict['cpe'] = cpe
+                                        weaknessform = WeaknessModelForm(weakness_data_dict)
+                                        try:
+                                            weaknessform.save()
+                                        except:
+                                            messages.error(self.request,
+                                                   '{} had error when saving to database. {}'.format(vuln_id.vuln_id, form.errors))
+                                else:
+                                    weaknessform = WeaknessModelForm(weakness_data_dict)
+                                    try:
+                                        weaknessform.save()
+                                    except:
+                                        messages.error(self.request,
+                                                       '{} had error when saving to database. {}'.format(
+                                                           vuln_id.vuln_id, form.errors))
+                            else:
+                                continue
                                 # checks for weakness objects created before the date of the current upload. if date is different,
                                 # updates weakness object to mark previous results as closed. eventually add logic to get user confirmation
                                 # if Weakness.objects.exclude(devices__id=specific_device.id, source_identifying_date=source_date).exists():
                                 #     messages.success(self.request, 'Credentialed Scan: ' + credentialed_scan + ' Previous scan results will be closed')
                                 #     Weakness.objects.exclude(devices__id=specific_device.id, source_identifying_date=source_date).update(status='closed')
-                            else:
-                                continue
             else:
                 messages.error(self.request, 'Wrong File Type, Zac!')
                 weaknessform = WeaknessModelForm()
