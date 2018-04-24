@@ -3,13 +3,23 @@ from django.db import models
 
 # Create your models here.
 class SecurityControl(models.Model):
-    control_number = models.CharField(max_length=16, unique=True)
+    control_number = models.CharField(max_length=32, unique=True)
     description = models.TextField()
     title = models.CharField(max_length=256)
 
     class Meta:
         db_table = 'security_control'
         unique_together = ('control_number', 'title')
+
+
+class CPE(models.Model):
+    cpe = models.CharField(max_length=128, unique=True)
+    # description = models.TextField()
+    # title = models.CharField(max_length=256)
+
+    # class Meta:
+    #     db_table = 'security_control'
+    #     unique_together = ('control_number', 'title')
 
 
 class PointOfContact(models.Model):
@@ -77,7 +87,12 @@ class Device(models.Model):
     hardware = models.CharField(max_length=64, blank=True, null=True)
     software = models.CharField(max_length=64, blank=True, null=True) # maybe take out
     system = models.ForeignKey(System, related_name="devices")
+    hostname = models.CharField(max_length=64, blank=True, null=True)
     ip = models.CharField(max_length=32, blank=True, null=True)
+    mac = models.CharField(max_length=128, blank=True, null=True)
+    bios_uid = models.CharField(max_length=164, blank=True, null=True)
+    netbios_name = models.CharField(max_length=64, blank=True, null=True)
+    cpe = models.ManyToManyField(CPE, blank=True)
 
     def __str__(self):
         return self.name
@@ -118,7 +133,13 @@ class Weakness(models.Model):
     cvss_temporal_score = models.TextField(blank=True, null=True)
     cvss_vector = models.TextField(blank=True, null=True)
     cvss_temporal_vector = models.TextField(blank=True, null=True)
+    cvss3_base_score = models.TextField(blank=True, null=True)
+    cvss3_vector = models.TextField(blank=True, null=True)
     exploit_available = models.TextField(blank=True, null=True)
+    cpe = models.TextField(blank=True, null=True)
+    cve = models.TextField(blank=True, null=True)
+    risk_factor = models.TextField(blank=True, null=True)
+    vuln_pub_date = models.TextField(blank=True, null=True)
     devices = models.ManyToManyField(Device, blank=True)
     security_control = models.ManyToManyField(SecurityControl, blank=True)
 
