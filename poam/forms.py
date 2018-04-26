@@ -40,7 +40,7 @@ class DeviceForm(ModelForm):
 
 
 class DocumentForm(forms.Form, ModelForm):
-    file = forms.FileField()
+    file = forms.FileField(widget=forms.ClearableFileInput(attrs={'multiple': True}))
     FILE_TYPE_CHOICES = [
         ('stig_checklist_file','STIG Checklist File'),
         ('nessus_scan_file', 'Nessus Scan File'),

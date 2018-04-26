@@ -31,8 +31,23 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
         kwargs['system'] = System.objects.get(id=self.kwargs['pk'])
         return kwargs
 
+    def post(self, request, *args, **kwargs):
+        # f = super(UploadArtifactView, self).post(request, *args, **kwargs)
+
+        form_class = self.get_form_class()
+        form = self.get_form(form_class)
+        files = request.FILES.getlist('file')
+        if form.is_valid():
+            # print(form.cleaned_data['file'])
+            form.cleaned_data['file'] = []
+            for f in files:
+                form.cleaned_data['file'].append(f)
+                # print(form.cleaned_data['file'])
+            return self.form_valid(form)
+        else:
+            return self.form_invalid(form)
+
     def form_valid(self, form):
-        data = form.cleaned_data['file']
         source_id = form.cleaned_data['source_identifying_event']
         source_tool = form.cleaned_data['source_identifying_tool']
         source_date = form.cleaned_data['source_identifying_date']
@@ -40,218 +55,215 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
         poc = form.cleaned_data['point_of_contact']
         file_type = form.cleaned_data['file_type']
         device = form.cleaned_data['devices']
-
-        # read and parse the file, create a Python dictionary `data_dict` from it
-        # start loop here for each Vuln_num in xml upload get Rule_title, Vuln_discuss,
-        # Comments, IA_Controls, Check_Content, Severity, Stigid
-        # Need check and message to make sure Trey or more than likely Zac doesn't do something dumb
-        if file_type == 'stig_checklist_file':
-            tree = ElementTree.parse(data)
-            root = tree.getroot()
-            if root.tag == "CHECKLIST":
-                for specific_device in device:
-                    if not Device.objects.filter(system=system, name=specific_device).exists():
-                        messages.error(self.request, 'Woops! One of the devices is not in the database')
-                        break
-                    for vuln in root.findall('.//VULN'):
-                        status = vuln.find('STATUS').text
-                        comments = vuln.find('COMMENTS').text
-                        severity = vuln[1][1].text
-                        title = vuln[5][1].text
-                        description = vuln[6][1].text
-                        chk_content = vuln[8][1].text
-                        fix_text = vuln[9][1].text
-                        try:
-                            vuln_id = VulnId(vuln_id=vuln[0][1].text)
-                            vuln_id.save()
-                        except IntegrityError:
-                            vuln_id = VulnId.objects.get(vuln_id=vuln[0][1].text)
-                        if Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).exists():
-                            Weakness.objects.filter(system=system, vuln_id=vuln_id).update(comments=comments,
-                            raw_severity=severity, source_identifying_event=source_id,
-                            source_identifying_tool=source_tool, check_contents=chk_content, fix_text=fix_text,
-                            point_of_contact=PointOfContact.objects.get(name=poc), status=status)
-                        else:
-                            if status == 'Open':
-                                # weakness = Weakness.objects.create(title=title, description=description, status=status, comments=comments, raw_severity=severity, source_identifying_event=source_id, source_identifying_tool=source_tool, source_identifying_date=source_date, vuln_id=vuln_id, check_contents=chk_content, fix_text=fix_text, system=system, point_of_contact=PointOfContact.objects.get(name=poc))
-                                data_dict = {'title': title, 'description': description, 'status': status,
-                                             'comments': comments, 'raw_severity': severity, 'source_identifying_event': source_id,
-                                             'source_identifying_tool': source_tool, 'source_identifying_date' : source_date, 'vuln_id': vuln_id.id,
-                                             'check_contents': chk_content, 'fix_text': fix_text, 'system': system.id,
-                                             'point_of_contact': PointOfContact.objects.get(name=poc).id, 'devices': device}
-                                if vuln[7][1].text is not None:
+        for data in form.cleaned_data['file']:
+            # read and parse the file, create a Python dictionary `data_dict` from it
+            # start loop here for each Vuln_num in xml upload get Rule_title, Vuln_discuss,
+            # Comments, IA_Controls, Check_Content, Severity, Stigid
+            # Need check and message to make sure Trey or more than likely Zac doesn't do something dumb
+            if file_type == 'stig_checklist_file':
+                tree = ElementTree.parse(data)
+                root = tree.getroot()
+                if root.tag == "CHECKLIST":
+                    for specific_device in device:
+                        if not Device.objects.filter(system=system, name=specific_device).exists():
+                            messages.error(self.request, 'Woops! One of the devices is not in the database')
+                            break
+                        for vuln in root.findall('.//VULN'):
+                            status = vuln.find('STATUS').text
+                            comments = vuln.find('COMMENTS').text
+                            severity = vuln[1][1].text
+                            title = vuln[5][1].text
+                            description = vuln[6][1].text
+                            chk_content = vuln[8][1].text
+                            fix_text = vuln[9][1].text
+                            try:
+                                vuln_id = VulnId(vuln_id=vuln[0][1].text)
+                                vuln_id.save()
+                            except IntegrityError:
+                                vuln_id = VulnId.objects.get(vuln_id=vuln[0][1].text)
+                            if Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).exists():
+                                Weakness.objects.filter(system=system, vuln_id=vuln_id).update(comments=comments,
+                                raw_severity=severity, source_identifying_event=source_id,
+                                source_identifying_tool=source_tool, check_contents=chk_content, fix_text=fix_text,
+                                point_of_contact=PointOfContact.objects.get(name=poc), status=status)
+                            else:
+                                if status == 'Open':
+                                    # weakness = Weakness.objects.create(title=title, description=description, status=status, comments=comments, raw_severity=severity, source_identifying_event=source_id, source_identifying_tool=source_tool, source_identifying_date=source_date, vuln_id=vuln_id, check_contents=chk_content, fix_text=fix_text, system=system, point_of_contact=PointOfContact.objects.get(name=poc))
+                                    data_dict = {'title': title, 'description': description, 'status': status,
+                                                 'comments': comments, 'raw_severity': severity, 'source_identifying_event': source_id,
+                                                 'source_identifying_tool': source_tool, 'source_identifying_date' : source_date, 'vuln_id': vuln_id.id,
+                                                 'check_contents': chk_content, 'fix_text': fix_text, 'system': system.id,
+                                                 'point_of_contact': PointOfContact.objects.get(name=poc).id, 'devices': device}
+                                    if vuln[7][1].text is not None:
+                                        try:
+                                            ia_control = SecurityControl(control_number=vuln[7][1].text, title='',
+                                                                         description='')
+                                            ia_control.save()
+                                            ia_control = SecurityControl.objects.filter(id=ia_control.id)
+                                        except IntegrityError:
+                                            ia_control = SecurityControl.objects.filter(control_number=vuln[7][1].text)
+                                        data_dict['security_control'] = ia_control
+                                    form = WeaknessModelForm(data_dict)
                                     try:
-                                        ia_control = SecurityControl(control_number=vuln[7][1].text, title='',
-                                                                     description='')
-                                        ia_control.save()
-                                        ia_control = SecurityControl.objects.filter(id=ia_control.id)
-                                    except IntegrityError:
-                                        ia_control = SecurityControl.objects.filter(control_number=vuln[7][1].text)
-                                    data_dict['security_control'] = ia_control
+                                        form.save()
+                                    except:
+                                        messages.error(self.request, '{} had error when saving to database. {}'.format(vuln_id.vuln_id, form.errors))
+                                else:
+                                    continue
+                else:
+                    messages.error(self.request, 'Wrong File Type, Zac!')
+                    return redirect(reverse("poam:upload-artifact"))
+            elif file_type == 'rmf_control_review_file':
+                try:
+                    wb = openpyxl.load_workbook(data)
+                    sheet = wb.active
+                except:
+                    messages.error(self.request, 'Wrong File Type, Zac!')
+                    return redirect(reverse("poam:upload-artifact"))
+                else:
+                    for row in range(2, sheet.max_row + 1):
+                        title = sheet['C{}'.format(row)].value
+                        status = sheet['D{}'.format(row)].value
+                        comments = sheet['E{}'.format(row)].value
+                        control_number = sheet['B{}'.format(row)].value
+                        try:
+                            security_control = SecurityControl(title=title, control_number=control_number, description='')
+                            security_control.save()
+                            security_controls = SecurityControl.objects.filter(control_number=control_number)
+                        except IntegrityError:
+                            security_control = SecurityControl.objects.get(control_number=control_number)
+                            security_controls = SecurityControl.objects.filter(control_number=control_number)
+
+                        if Weakness.objects.filter(title=title, security_control__id=security_control.id).exists():
+                            Weakness.objects.filter(title=title, security_control=security_controls).update(status=status, comments=comments, source_identifying_event=source_id, source_identifying_tool=source_tool, devices=device, security_control=security_controls, source_identifying_date=source_date, system=System.objects.get(name=system).id, point_of_contact=PointOfContact.objects.get(name=poc).id)
+                        else:
+                            if status == 'Planned':
+                                data_dict = {'title': title, 'description': '', 'status': status, 'comments': comments, 'source_identifying_event': source_id, 'source_identifying_tool': source_tool, 'devices': device, 'security_control': security_controls, 'source_identifying_date' : source_date, 'system': System.objects.get(name=system).id, 'point_of_contact': PointOfContact.objects.get(name=poc).id}
                                 form = WeaknessModelForm(data_dict)
                                 try:
                                     form.save()
                                 except:
-                                    messages.error(self.request, '{} had error when saving to database. {}'.format(vuln_id.vuln_id, form.errors))
-                            else:
-                                continue
-            else:
-                messages.error(self.request, 'Wrong File Type, Zac!')
-                return redirect(reverse("poam:upload-artifact"))
-        elif file_type == 'rmf_control_review_file':
-            try:
-                wb = openpyxl.load_workbook(data)
-                sheet = wb.active
-            except:
-                messages.error(self.request, 'Wrong File Type, Zac!')
-                return redirect(reverse("poam:upload-artifact"))
-            else:
-                for row in range(2, sheet.max_row + 1):
-                    title = sheet['C{}'.format(row)].value
-                    status = sheet['D{}'.format(row)].value
-                    comments = sheet['E{}'.format(row)].value
-                    control_number = sheet['B{}'.format(row)].value
-                    try:
-                        security_control = SecurityControl(title=title, control_number=control_number, description='')
-                        security_control.save()
-                        security_controls = SecurityControl.objects.filter(control_number=control_number)
-                    except IntegrityError:
-                        security_control = SecurityControl.objects.get(control_number=control_number)
-                        security_controls = SecurityControl.objects.filter(control_number=control_number)
+                                    messages.error(self.request, form.errors)
+            elif file_type == 'nessus_scan_file':
+                # parse data from nessus file and define as tree then get the root of the xml file
+                tree = ElementTree.parse(data)
+                root = tree.getroot()
+                # verify that the file is in fact a nessus file by checking the root tag of the xml
+                if root.tag == 'NessusClientData_v2':
+                    # define static variables from nessus file
+                    # hostname = root.findtext(".//tag[@name='hostname']")
+                    ip = root.findtext(".//tag[@name='host-ip']")
+                    os = root.findtext(".//tag[@name='operating-system']")
+                    hostname = root.findtext(".//tag[@name='hostname']")
+                    netbios_name = root.findtext(".//tag[@name='netbios-name']")
+                    mac = root.findtext(".//tag[@name='mac-address']")
+                    bios_uid = root.findtext(".//tag[@name='bios-uuid']")
+                    cpe = [root.findtext(".//tag[@name='cpe']"), root.findtext(".//tag[@name='cpe-0']"), root.findtext(".//tag[@name='cpe-1']"), root.findtext(".//tag[@name='cpe-2']"), root.findtext(".//tag[@name='cpe-3']"), root.findtext(".//tag[@name='cpe-4']"), root.findtext(".//tag[@name='cpe-5']")]
+                    credentialed_scan = root.findtext(".//tag[@name='Credentialed_Scan']")
 
-                    if Weakness.objects.filter(title=title, security_control__id=security_control.id).exists():
-                        Weakness.objects.filter(title=title, security_control=security_controls).update(status=status, comments=comments, source_identifying_event=source_id, source_identifying_tool=source_tool, devices=device, security_control=security_controls, source_identifying_date=source_date, system=System.objects.get(name=system).id, point_of_contact=PointOfContact.objects.get(name=poc).id)
-                    else:
-                        if status == 'Planned':
-                            data_dict = {'title': title, 'description': '', 'status': status, 'comments': comments, 'source_identifying_event': source_id, 'source_identifying_tool': source_tool, 'devices': device, 'security_control': security_controls, 'source_identifying_date' : source_date, 'system': System.objects.get(name=system).id, 'point_of_contact': PointOfContact.objects.get(name=poc).id}
-                            form = WeaknessModelForm(data_dict)
-                            try:
-                                form.save()
-                            except:
-                                messages.error(self.request, form.errors)
-        elif file_type == 'nessus_scan_file':
-            # parse data from nessus file and define as tree then get the root of the xml file
-            tree = ElementTree.parse(data)
-            root = tree.getroot()
-            # verify that the file is in fact a nessus file by checking the root tag of the xml
-            if root.tag == 'NessusClientData_v2':
-                # define static variables from nessus file
-                # hostname = root.findtext(".//tag[@name='hostname']")
-                ip = root.findtext(".//tag[@name='host-ip']")
-                os = root.findtext(".//tag[@name='operating-system']")
-                hostname = root.findtext(".//tag[@name='hostname']")
-                netbios_name = root.findtext(".//tag[@name='netbios-name']")
-                mac = root.findtext(".//tag[@name='mac-address']")
-                bios_uid = root.findtext(".//tag[@name='bios-uuid']")
-                cpe = [root.findtext(".//tag[@name='cpe']"), root.findtext(".//tag[@name='cpe-0']"), root.findtext(".//tag[@name='cpe-1']"), root.findtext(".//tag[@name='cpe-2']"), root.findtext(".//tag[@name='cpe-3']"), root.findtext(".//tag[@name='cpe-4']"), root.findtext(".//tag[@name='cpe-5']")]
-                credentialed_scan = root.findtext(".//tag[@name='Credentialed_Scan']")
-
-                for specific_device in device:
-                    if not Device.objects.filter(system=system, name=specific_device).exists():
-                        messages.error(self.request, 'Woops! One of the devices is not in the database')
-                        break
-                    else:
-                        Device.objects.filter(system=system, name=specific_device).update(os=os, ip=ip, hostname=hostname, netbios_name=netbios_name, mac=mac, bios_uid=bios_uid)
-                    # for loop of nessus xml file to get relevant weakness information
-                    for vuln in tree.iter('ReportItem'):
-                        vuln_id = vuln.get('pluginID')
-                        severity = vuln.get('severity')
-                        description = vuln.findtext('description')
-                        title = vuln.get('pluginName')
-                        plugin_family = vuln.get('pluginFamily')
-                        plugin_output = vuln.findtext('plugin_output')
-                        fix_text = vuln.findtext('solution')
-                        synopsis = vuln.findtext('synopsis')
-                        status = 'open'
-                        cvss_base_score = vuln.findtext('cvss_base_score')
-                        cvss_temporal_score = vuln.findtext('cvss_temporal_score')
-                        cvss_vector = vuln.findtext('cvss_vector')
-                        cvss_temporal_vector = vuln.findtext('cvss_temporal_vector')
-                        cvss3_base_score = vuln.findtext('cvss3_base_score')
-                        cvss3_vector = vuln.findtext('cvss3_vector')
-                        exploit_available = vuln.findtext('exploit_available')
-                        cpe.append(vuln.findtext('cpe'))
-                        cve = vuln.findtext('cve')
-                        risk_factor = vuln.findtext('risk_factor')
-                        vuln_pub_date = vuln.findtext('vuln_publication_date')
-                        # try block to test to see if vuln_id already exists in DB. if not, creates object
-                        try:
-                            vuln_id = VulnId(vuln_id=vuln_id)
-                            vuln_id.save()
-                        except IntegrityError:
-                            vuln_id = vuln.get('pluginID')
-                            vuln_id = VulnId.objects.get(vuln_id=vuln_id)
-                        # checks to see if weakness object with this hostname and vuln id already exists. if so, it updates existing object
-                        if Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).exists():
-                            Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).update(raw_severity=severity,
-                             plugin_family=plugin_family, synopsis=synopsis, plugin_output=plugin_output,source_identifying_event=source_id, source_identifying_tool=source_tool,
-                             fix_text=fix_text, point_of_contact=PointOfContact.objects.get(name=poc), status=status, cvss_base_score=cvss_base_score,
-                             cvss_temporal_score=cvss_temporal_score, cvss_vector=cvss_vector, cvss_temporal_vector=cvss_temporal_vector, cvss3_base_score=cvss3_base_score, cvss3_vector=cvss3_vector,
-                             cve=cve, risk_factor=risk_factor, vuln_pub_date=vuln_pub_date, exploit_available=exploit_available,
-                             credentialed_scan=credentialed_scan)
-                            if cpe is not None:
-                                for cpe in cpe:
-                                   try:
-                                       cpe = CPE(cpe=cpe)
-                                       cpe.save()
-                                       cpe = CPE.objects.filter(id=cpe.id)
-                                   except IntegrityError:
-                                       cpe = CPE.objects.filter(cpe=cpe)
-                                   Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).update(cpe=cpe)
+                    for specific_device in device:
+                        if not Device.objects.filter(system=system, name=specific_device).exists():
+                            messages.error(self.request, 'Woops! One of the devices is not in the database')
+                            break
                         else:
-                            # if severity is not 0 then create and new weakness object using a data dictionary file
-                            if severity != '0':
-                                weakness_data_dict = {'title': title, 'system': system.id, 'description': description, 'status': status,
-                                             'raw_severity': severity, 'source_identifying_event': source_id, 'source_identifying_date' : source_date,
-                                             'source_identifying_tool': source_tool, 'vuln_id': vuln_id.id,
-                                             'fix_text': fix_text, 'devices': device,
-                                             'point_of_contact': PointOfContact.objects.get(name=poc).id,
-                                             'plugin_family': plugin_family, 'plugin_output' : plugin_output,
-                                             'synopsis' : synopsis, 'credentialed_scan' : credentialed_scan,
-                                             'cvss_base_score' : cvss_base_score, 'cvss_vector' : cvss_vector, 'cvss_temporal_score' : cvss_temporal_score, 'cvss_temporal_vector' : cvss_temporal_vector,
-                                             'cvss3_base_score' : cvss3_base_score, 'cvss3_vector' : cvss3_vector, 'exploit_available' : exploit_available, 'cve' : cve, 'risk_factor' : risk_factor,
-                                             'vuln_pub_date' : vuln_pub_date}
+                            Device.objects.filter(system=system, name=specific_device).update(os=os, ip=ip, hostname=hostname, netbios_name=netbios_name, mac=mac, bios_uid=bios_uid)
+                        # for loop of nessus xml file to get relevant weakness information
+                        for vuln in tree.iter('ReportItem'):
+                            vuln_id = vuln.get('pluginID')
+                            severity = vuln.get('severity')
+                            description = vuln.findtext('description')
+                            title = vuln.get('pluginName')
+                            plugin_family = vuln.get('pluginFamily')
+                            plugin_output = vuln.findtext('plugin_output')
+                            fix_text = vuln.findtext('solution')
+                            synopsis = vuln.findtext('synopsis')
+                            status = 'open'
+                            cvss_base_score = vuln.findtext('cvss_base_score')
+                            cvss_temporal_score = vuln.findtext('cvss_temporal_score')
+                            cvss_vector = vuln.findtext('cvss_vector')
+                            cvss_temporal_vector = vuln.findtext('cvss_temporal_vector')
+                            cvss3_base_score = vuln.findtext('cvss3_base_score')
+                            cvss3_vector = vuln.findtext('cvss3_vector')
+                            exploit_available = vuln.findtext('exploit_available')
+                            cpe.append(vuln.findtext('cpe'))
+                            cve = vuln.findtext('cve')
+                            risk_factor = vuln.findtext('risk_factor')
+                            vuln_pub_date = vuln.findtext('vuln_publication_date')
+                            # try block to test to see if vuln_id already exists in DB. if not, creates object
+                            try:
+                                vuln_id = VulnId(vuln_id=vuln_id)
+                                vuln_id.save()
+                            except IntegrityError:
+                                vuln_id = vuln.get('pluginID')
+                                vuln_id = VulnId.objects.get(vuln_id=vuln_id)
+                            # checks to see if weakness object with this hostname and vuln id already exists. if so, it updates existing object
+                            if Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).exists():
+                                Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).update(raw_severity=severity,
+                                 plugin_family=plugin_family, synopsis=synopsis, plugin_output=plugin_output,source_identifying_event=source_id, source_identifying_tool=source_tool,
+                                 fix_text=fix_text, point_of_contact=PointOfContact.objects.get(name=poc), status=status, cvss_base_score=cvss_base_score,
+                                 cvss_temporal_score=cvss_temporal_score, cvss_vector=cvss_vector, cvss_temporal_vector=cvss_temporal_vector, cvss3_base_score=cvss3_base_score, cvss3_vector=cvss3_vector,
+                                 cve=cve, risk_factor=risk_factor, vuln_pub_date=vuln_pub_date, exploit_available=exploit_available,
+                                 credentialed_scan=credentialed_scan)
                                 if cpe is not None:
                                     for cpe in cpe:
-                                        try:
-                                            cpe = CPE(cpe=cpe)
-                                            cpe.save()
-                                            cpe = CPE.objects.filter(id=cpe.id)
-                                        except IntegrityError:
-                                            cpe = CPE.objects.filter(cpe=cpe)
-                                        weakness_data_dict['cpe'] = cpe
+                                       try:
+                                           cpe = CPE(cpe=cpe)
+                                           cpe.save()
+                                           cpe = CPE.objects.filter(id=cpe.id)
+                                       except IntegrityError:
+                                           cpe = CPE.objects.filter(cpe=cpe)
+                                       Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).update(cpe=cpe)
+                            else:
+                                # if severity is not 0 then create and new weakness object using a data dictionary file
+                                if severity != '0':
+                                    weakness_data_dict = {'title': title, 'system': system.id, 'description': description, 'status': status,
+                                                 'raw_severity': severity, 'source_identifying_event': source_id, 'source_identifying_date' : source_date,
+                                                 'source_identifying_tool': source_tool, 'vuln_id': vuln_id.id,
+                                                 'fix_text': fix_text, 'devices': device,
+                                                 'point_of_contact': PointOfContact.objects.get(name=poc).id,
+                                                 'plugin_family': plugin_family, 'plugin_output' : plugin_output,
+                                                 'synopsis' : synopsis, 'credentialed_scan' : credentialed_scan,
+                                                 'cvss_base_score' : cvss_base_score, 'cvss_vector' : cvss_vector, 'cvss_temporal_score' : cvss_temporal_score, 'cvss_temporal_vector' : cvss_temporal_vector,
+                                                 'cvss3_base_score' : cvss3_base_score, 'cvss3_vector' : cvss3_vector, 'exploit_available' : exploit_available, 'cve' : cve, 'risk_factor' : risk_factor,
+                                                 'vuln_pub_date' : vuln_pub_date}
+                                    if cpe is not None:
+                                        for cpe in cpe:
+                                            try:
+                                                cpe = CPE(cpe=cpe)
+                                                cpe.save()
+                                                cpe = CPE.objects.filter(id=cpe.id)
+                                            except IntegrityError:
+                                                cpe = CPE.objects.filter(cpe=cpe)
+                                            weakness_data_dict['cpe'] = cpe
+                                            weaknessform = WeaknessModelForm(weakness_data_dict)
+                                            try:
+                                                weaknessform.save()
+                                            except:
+                                                messages.error(self.request, '{} had error when saving to database. {}'.format(vuln_id.vuln_id, form.errors))
+                                    else:
                                         weaknessform = WeaknessModelForm(weakness_data_dict)
                                         try:
                                             weaknessform.save()
                                         except:
-                                            messages.error(self.request,
-                                                   '{} had error when saving to database. {}'.format(vuln_id.vuln_id, form.errors))
+                                            messages.error(self.request, '{} had error when saving to database. {}'.format(vuln_id.vuln_id, form.errors))
                                 else:
-                                    weaknessform = WeaknessModelForm(weakness_data_dict)
-                                    try:
-                                        weaknessform.save()
-                                    except:
-                                        messages.error(self.request,
-                                                       '{} had error when saving to database. {}'.format(
-                                                           vuln_id.vuln_id, form.errors))
-                            else:
-                                continue
-                                # checks for weakness objects created before the date of the current upload. if date is different,
-                                # updates weakness object to mark previous results as closed. eventually add logic to get user confirmation
-                                # if Weakness.objects.exclude(devices__id=specific_device.id, source_identifying_date=source_date).exists():
-                                #     messages.success(self.request, 'Credentialed Scan: ' + credentialed_scan + ' Previous scan results will be closed')
-                                #     Weakness.objects.exclude(devices__id=specific_device.id, source_identifying_date=source_date).update(status='closed')
-            else:
-                messages.error(self.request, 'Wrong File Type, Zac!')
-                weaknessform = WeaknessModelForm()
-                weaknessform.save()
-        # want to close nessus weakness from previous scans on this device
-        if Weakness.objects.exclude(system=system, source_identifying_date=source_date).exists():
-            messages.success(self.request, 'Credentialed Scan: {} Would you like to close previous ACAS scan results for this device?'.format(credentialed_scan))
-            Weakness.objects.exclude(system=system, source_identifying_date=source_date).update(status='closed')
+                                    continue
+                                    # checks for weakness objects created before the date of the current upload. if date is different,
+                                    # updates weakness object to mark previous results as closed. eventually add logic to get user confirmation
+                                    # if Weakness.objects.exclude(devices__id=specific_device.id, source_identifying_date=source_date).exists():
+                                    #     messages.success(self.request, 'Credentialed Scan: ' + credentialed_scan + ' Previous scan results will be closed')
+                                    #     Weakness.objects.exclude(devices__id=specific_device.id, source_identifying_date=source_date).update(status='closed')
+                else:
+                    messages.error(self.request, 'Wrong File Type, Zac!')
+                    weaknessform = WeaknessModelForm()
+                    weaknessform.save()
+            # want to close nessus weakness from previous scans on this device
+            if Weakness.objects.exclude(system=system, source_identifying_date=source_date).exists():
+                messages.success(self.request, 'Credentialed Scan: {} Would you like to close previous ACAS scan results for this device?'.format(credentialed_scan))
+                Weakness.objects.exclude(system=system, source_identifying_date=source_date).update(status='closed')
 
-        messages.success(self.request, 'Artifacts Uploaded Successfully!')
-        return redirect(reverse('poam:edit-system', kwargs={'pk': self.kwargs['pk']}))
+            messages.success(self.request, 'Artifacts Uploaded Successfully!')
+            return redirect(reverse('poam:edit-system', kwargs={'pk': self.kwargs['pk']}))
 
 
 class NewSystemView(LoginRequiredMixin, generic.CreateView):
