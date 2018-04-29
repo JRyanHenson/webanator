@@ -44,7 +44,8 @@ class DocumentForm(forms.Form, ModelForm):
     FILE_TYPE_CHOICES = [
         ('stig_checklist_file','STIG Checklist File'),
         ('nessus_scan_file', 'Nessus Scan File'),
-        ('rmf_control_review_file', 'RMF Control Review File')
+        ('rmf_control_review_file', 'RMF Control Review File'),
+        # ('cci_list', 'Update to CCI List')
     ]
     file_type = forms.CharField(label='File Type', widget=forms.RadioSelect(choices=FILE_TYPE_CHOICES))
 

@@ -12,6 +12,17 @@ class SecurityControl(models.Model):
         unique_together = ('control_number', 'title')
 
 
+class CCI(models.Model):
+    cci = models.CharField(max_length=32, unique=True)
+    sc = models.CharField(max_length=32, null=True, blank=True)
+    definition = models.TextField(null=True, blank=True)
+    scref = models.CharField(max_length=32, null=True, blank=True)
+
+    # class Meta:
+    #     db_table = 'cci'
+    #     unique_together = ('control_number', 'cci')
+
+
 class CPE(models.Model):
     cpe = models.CharField(max_length=128, unique=True)
     # description = models.TextField()
@@ -111,6 +122,8 @@ class Weakness(models.Model):
     description = models.TextField(blank=True)
     system = models.ForeignKey(System, related_name="weaknesses")
     point_of_contact = models.ForeignKey(PointOfContact, related_name="weaknesses")
+    vuln_id = models.ForeignKey(VulnId, related_name="weaknesses", null=True, blank=True)
+    cci = models.ForeignKey(CCI, related_name="weaknesses", null=True, blank=True)
     mitigation = models.TextField(blank=True, null=True)
     resources_required = models.CharField(max_length=16, blank=True, null=True)
     scheduled_completion_date = models.DateField(blank=True, null=True)
@@ -122,7 +135,6 @@ class Weakness(models.Model):
     source_identifying_date = models.DateField(auto_now=False)
     source_identifying_event = models.CharField(max_length=32)
     source_identifying_tool = models.CharField(max_length=32)
-    vuln_id = models.ForeignKey(VulnId, related_name="weaknesses", null=True, blank=True)
     check_contents = models.TextField(blank=True, null=True)
     fix_text = models.TextField(blank=True, null=True)
     plugin_family = models.TextField(blank=True, null=True)
@@ -136,12 +148,12 @@ class Weakness(models.Model):
     cvss3_base_score = models.TextField(blank=True, null=True)
     cvss3_vector = models.TextField(blank=True, null=True)
     exploit_available = models.TextField(blank=True, null=True)
-    cpe = models.TextField(blank=True, null=True)
     cve = models.TextField(blank=True, null=True)
     risk_factor = models.TextField(blank=True, null=True)
     vuln_pub_date = models.TextField(blank=True, null=True)
     devices = models.ManyToManyField(Device, blank=True)
     security_control = models.ManyToManyField(SecurityControl, blank=True)
+    cpe = models.ManyToManyField(CPE, blank=True)
 
     def __str__(self):
         return self.title
