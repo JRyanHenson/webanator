@@ -9,6 +9,7 @@ from django.db import IntegrityError
 
 import openpyxl
 import datetime
+import os
 
 from .forms import *
 from .models import *
@@ -54,7 +55,6 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
         poc = form.cleaned_data['point_of_contact']
         file_type = form.cleaned_data['file_type']
         device = form.cleaned_data['devices']
-<<<<<<< Updated upstream
         for data in form.cleaned_data['file']:
             # read and parse the file, create a Python dictionary `data_dict` from it
             # start loop here for each Vuln_num in xml upload get Rule_title, Vuln_discuss,
@@ -130,35 +130,6 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                             security_control = SecurityControl(title=title, control_number=control_number, description='')
                             security_control.save()
                             security_controls = SecurityControl.objects.filter(control_number=control_number)
-=======
-
-        # read and parse the file, create a Python dictionary `data_dict` from it
-        # start loop here for each Vuln_num in xml upload get Rule_title, Vuln_discuss,
-        # Comments, IA_Controls, Check_Content, Severity, Stigid
-        # Need check and message to make sure Trey or more than likely Zac doesn't do something dumb
-        if file_type == 'stig_checklist_file':
-            tree = ElementTree.parse(data)
-            root = tree.getroot()
-            if root.tag == "CHECKLIST":
-                for specific_device in device:
-                    if not Device.objects.filter(system=system, name=specific_device).exists():
-                        messages.error(self.request, 'Woops! One of the devices is not in the database')
-                        break
-                    for vuln in root.findall('.//VULN'):
-                        status = vuln.find('STATUS').text
-                        # Need to add finnding details
-                        comments = vuln.find('COMMENTS').text
-                        severity = vuln[1][1].text
-                        title = vuln[5][1].text
-                        description = vuln[6][1].text
-                        chk_content = vuln[8][1].text
-                        fix_text = vuln[9][1].text
-                        cci = vuln[24][1].text
-                        vuln_id = vuln[0][1].text
-                        try:
-                            vuln_id = VulnId(vuln_id=)
-                            vuln_id.save()
->>>>>>> Stashed changes
                         except IntegrityError:
                             security_control = SecurityControl.objects.get(control_number=control_number)
                             security_controls = SecurityControl.objects.filter(control_number=control_number)
@@ -172,7 +143,6 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                                 try:
                                     form.save()
                                 except:
-<<<<<<< Updated upstream
                                     messages.error(self.request, form.errors)
             elif file_type == 'nessus_scan_file':
                 # parse data from nessus file and define as tree then get the root of the xml file
@@ -195,114 +165,6 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                         if not Device.objects.filter(system=system, name=specific_device).exists():
                             messages.error(self.request, 'Woops! One of the devices is not in the database')
                             break
-=======
-                                    messages.error(self.request, '{} had error when saving to database. {}'.format(vuln_id.vuln_id, form.errors))
-                            else:
-                                continue
-            else:
-                messages.error(self.request, 'Wrong File Type, Zac!')
-                return redirect(reverse("poam:upload-artifact"))
-        elif file_type == 'rmf_control_review_file':
-            try:
-                wb = openpyxl.load_workbook(data)
-                sheet = wb.active
-            except:
-                messages.error(self.request, 'Wrong File Type, Zac!')
-                return redirect(reverse("poam:upload-artifact"))
-            else:
-                for row in range(2, sheet.max_row + 1):
-                    title = sheet['C{}'.format(row)].value
-                    status = sheet['D{}'.format(row)].value
-                    comments = sheet['E{}'.format(row)].value
-                    control_number = sheet['B{}'.format(row)].value
-                    try:
-                        security_control = SecurityControl(title=title, control_number=control_number, description='')
-                        security_control.save()
-                        security_controls = SecurityControl.objects.filter(control_number=control_number)
-                    except IntegrityError:
-                        security_control = SecurityControl.objects.get(control_number=control_number)
-                        security_controls = SecurityControl.objects.filter(control_number=control_number)
-
-                    if Weakness.objects.filter(title=title, security_control__id=security_control.id).exists():
-                        Weakness.objects.filter(title=title, security_control=security_controls).update(status=status, comments=comments, source_identifying_event=source_id, source_identifying_tool=source_tool, devices=device, security_control=security_controls, source_identifying_date=source_date, system=System.objects.get(name=system).id, point_of_contact=PointOfContact.objects.get(name=poc).id)
-                    else:
-                        if status == 'Planned':
-                            data_dict = {'title': title, 'description': '', 'status': status, 'comments': comments, 'source_identifying_event': source_id, 'source_identifying_tool': source_tool, 'devices': device, 'security_control': security_controls, 'source_identifying_date' : source_date, 'system': System.objects.get(name=system).id, 'point_of_contact': PointOfContact.objects.get(name=poc).id}
-                            form = WeaknessModelForm(data_dict)
-                            try:
-                                form.save()
-                            except:
-                                messages.error(self.request, form.errors)
-        elif file_type == 'nessus_scan_file':
-            # parse data from nessus file and define as tree then get the root of the xml file
-            tree = ElementTree.parse(data)
-            root = tree.getroot()
-            # verify that the file is in fact a nessus file by checking the root tag of the xml
-            if root.tag == 'NessusClientData_v2':
-                # define static variables from nessus file
-                # hostname = root.findtext(".//tag[@name='hostname']")
-                ip = root.findtext(".//tag[@name='host-ip']")
-                os = root.findtext(".//tag[@name='operating-system']")
-                hostname = root.findtext(".//tag[@name='hostname']")
-                netbios_name = root.findtext(".//tag[@name='netbios-name']")
-                mac = root.findtext(".//tag[@name='mac-address']")
-                bios_uid = root.findtext(".//tag[@name='bios-uuid']")
-                cpe = [root.findtext(".//tag[@name='cpe']"), root.findtext(".//tag[@name='cpe-0']"), root.findtext(".//tag[@name='cpe-1']"), root.findtext(".//tag[@name='cpe-2']"), root.findtext(".//tag[@name='cpe-3']"), root.findtext(".//tag[@name='cpe-4']"), root.findtext(".//tag[@name='cpe-5']")]
-                credentialed_scan = root.findtext(".//tag[@name='Credentialed_Scan']")
-
-                for specific_device in device:
-                    if not Device.objects.filter(system=system, name=specific_device).exists():
-                        messages.error(self.request, 'Woops! Device is not in the database')
-                        break
-                    else:
-                        Device.objects.filter(system=system, name=specific_device).update(os=os, ip=ip, hostname=hostname, netbios_name=netbios_name, mac=mac, bios_uid=bios_uid)
-                    # for loop of nessus xml file to get relevant weakness information
-                    for vuln in tree.iter('ReportItem'):
-                        vuln_id = vuln.get('pluginID')
-                        severity = vuln.get('severity')
-                        description = vuln.findtext('description')
-                        title = vuln.get('pluginName')
-                        plugin_family = vuln.get('pluginFamily')
-                        plugin_output = vuln.findtext('plugin_output')
-                        fix_text = vuln.findtext('solution')
-                        synopsis = vuln.findtext('synopsis')
-                        status = 'open'
-                        cvss_base_score = vuln.findtext('cvss_base_score')
-                        cvss_temporal_score = vuln.findtext('cvss_temporal_score')
-                        cvss_vector = vuln.findtext('cvss_vector')
-                        cvss_temporal_vector = vuln.findtext('cvss_temporal_vector')
-                        cvss3_base_score = vuln.findtext('cvss3_base_score')
-                        cvss3_vector = vuln.findtext('cvss3_vector')
-                        exploit_available = vuln.findtext('exploit_available')
-                        cpe.append(vuln.findtext('cpe'))
-                        cve = vuln.findtext('cve')
-                        risk_factor = vuln.findtext('risk_factor')
-                        vuln_pub_date = vuln.findtext('vuln_publication_date')
-                        # try block to test to see if vuln_id already exists in DB. if not, creates object
-                        try:
-                            vuln_id = VulnId(vuln_id=vuln_id)
-                            vuln_id.save()
-                        except IntegrityError:
-                            vuln_id = vuln.get('pluginID')
-                            vuln_id = VulnId.objects.get(vuln_id=vuln_id)
-                        # checks to see if weakness object with this hostname and vuln id already exists. if so, it updates existing object
-                        if Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).exists():
-                            Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).update(raw_severity=severity,
-                             plugin_family=plugin_family, synopsis=synopsis, plugin_output=plugin_output,source_identifying_event=source_id, source_identifying_tool=source_tool,
-                             fix_text=fix_text, point_of_contact=PointOfContact.objects.get(name=poc), status=status, cvss_base_score=cvss_base_score,
-                             cvss_temporal_score=cvss_temporal_score, cvss_vector=cvss_vector, cvss_temporal_vector=cvss_temporal_vector, cvss3_base_score=cvss3_base_score, cvss3_vector=cvss3_vector,
-                             cve=cve, risk_factor=risk_factor, vuln_pub_date=vuln_pub_date, exploit_available=exploit_available,
-                             credentialed_scan=credentialed_scan)
-                            if cpe is not None:
-                                for cpe in cpe:
-                                   try:
-                                       cpe = CPE(cpe=cpe)
-                                       cpe.save()
-                                       cpe = CPE.objects.filter(id=cpe.id)
-                                   except IntegrityError:
-                                       cpe = CPE.objects.filter(cpe=cpe)
-                                   Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).update(cpe=cpe)
->>>>>>> Stashed changes
                         else:
                             Device.objects.filter(system=system, name=specific_device).update(os=os, ip=ip, hostname=hostname, netbios_name=netbios_name, mac=mac, bios_uid=bios_uid)
                         # for loop of nessus xml file to get relevant weakness information
@@ -385,7 +247,6 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                                         except:
                                             messages.error(self.request, '{} had error when saving to database. {}'.format(vuln_id.vuln_id, form.errors))
                                 else:
-<<<<<<< Updated upstream
                                     continue
                                     # checks for weakness objects created before the date of the current upload. if date is different,
                                     # updates weakness object to mark previous results as closed. eventually add logic to get user confirmation
@@ -403,44 +264,6 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
 
             messages.success(self.request, 'Artifacts Uploaded Successfully!')
             return redirect(reverse('poam:edit-system', kwargs={'pk': self.kwargs['pk']}))
-=======
-                                    weaknessform = WeaknessModelForm(weakness_data_dict)
-                                    try:
-                                        weaknessform.save()
-                                    except:
-                                        messages.error(self.request,
-                                                       '{} had error when saving to database. {}'.format(
-                                                           vuln_id.vuln_id, form.errors))
-                            else:
-                                continue
-                            if Weakness.objects.exclude(devices__id=specific_device.id, source_identifying_date=source_date).exists():
-                                messages.success(self.request,'Credentialed Scan: ' + credentialed_scan + ' Previous scan results will be closed')
-                                Weakness.objects.exclude(devices__id=specific_device.id, source_identifying_date=source_date).update(status='closed')
-            else:
-                messages.error(self.request, 'Wrong File Type, Zac!')
-                weaknessform = WeaknessModelForm()
-                weaknessform.save()
-        # Used to upload CCI/SecurityControl List. Not needed for regular use.
-        # elif file_type == 'cci_list' :
-        #     tree = ElementTree.parse(data)
-        #     root = tree.getroot()
-        #     if root.tag == "{http://iase.disa.mil/cci}cci_list":
-        #         for child in tree.iter('{http://iase.disa.mil/cci}cci_item'):
-        #             cci = child.get('id')
-        #             definition = child.find('{http://iase.disa.mil/cci}definition').text
-        #             references = child.findall(".//*[@title='NIST SP 800-53 Revision 4']")
-        #             for reference in references:
-        #                 scref = reference.get('index')
-        #                 sc = scref.split(" ")[0]
-        #                 sci_input = CCI(cci=cci, sc=sc, definition=definition, scref=scref)
-        #                 sci_input.save()
-        #     else:
-        #         messages.error(self.request, 'Wrong File Type, Zac!')
-        #         return redirect(reverse("poam:upload-artifact"))
-
-        messages.success(self.request, 'Artifacts Uploaded Successfully!')
-        return redirect(reverse('poam:edit-system', kwargs={'pk': self.kwargs['pk']}))
->>>>>>> Stashed changes
 
 
 class NewSystemView(LoginRequiredMixin, generic.CreateView):
