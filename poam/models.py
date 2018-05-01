@@ -13,7 +13,7 @@ class SecurityControl(models.Model):
 
 
 class CCI(models.Model):
-    cci = models.CharField(max_length=32, unique=True)
+    cci = models.CharField(max_length=32, unique=False)
     sc = models.CharField(max_length=32, null=True, blank=True)
     definition = models.TextField(null=True, blank=True)
     scref = models.CharField(max_length=32, null=True, blank=True)
@@ -21,16 +21,6 @@ class CCI(models.Model):
     # class Meta:
     #     db_table = 'cci'
     #     unique_together = ('control_number', 'cci')
-
-
-class CPE(models.Model):
-    cpe = models.CharField(max_length=128, unique=True)
-    # description = models.TextField()
-    # title = models.CharField(max_length=256)
-
-    # class Meta:
-    #     db_table = 'security_control'
-    #     unique_together = ('control_number', 'title')
 
 
 class PointOfContact(models.Model):
@@ -92,18 +82,27 @@ class VulnId(models.Model):
         db_table = 'vuln_id'
 
 
+class CPE(models.Model):
+    cpe = models.CharField(max_length=128, unique=True)
+    # description = models.TextField()
+    # title = models.CharField(max_length=256)
+
+    # class Meta:
+    #     db_table = 'security_control'
+    #     unique_together = ('control_number', 'title')
+
+
 class Device(models.Model):
     name = models.CharField(max_length=64)
     os = models.CharField(max_length=128, blank=True, null=True)
     hardware = models.CharField(max_length=64, blank=True, null=True)
-    software = models.CharField(max_length=64, blank=True, null=True) # maybe take out
     system = models.ForeignKey(System, related_name="devices")
     hostname = models.CharField(max_length=64, blank=True, null=True)
     ip = models.CharField(max_length=32, blank=True, null=True)
     mac = models.CharField(max_length=128, blank=True, null=True)
     bios_uid = models.CharField(max_length=164, blank=True, null=True)
     netbios_name = models.CharField(max_length=64, blank=True, null=True)
-    cpe = models.ManyToManyField(CPE, blank=True)
+    cpes = models.ManyToManyField(CPE, unique=False, blank=True)
 
     def __str__(self):
         return self.name
@@ -124,6 +123,7 @@ class Weakness(models.Model):
     point_of_contact = models.ForeignKey(PointOfContact, related_name="weaknesses")
     vuln_id = models.ForeignKey(VulnId, related_name="weaknesses", null=True, blank=True)
     cci = models.ForeignKey(CCI, related_name="weaknesses", null=True, blank=True)
+    # cpe = models.ForeignKey(CPE, related_name="weaknesses", null=True, blank=True)
     mitigation = models.TextField(blank=True, null=True)
     resources_required = models.CharField(max_length=16, blank=True, null=True)
     scheduled_completion_date = models.DateField(blank=True, null=True)
@@ -153,7 +153,7 @@ class Weakness(models.Model):
     vuln_pub_date = models.TextField(blank=True, null=True)
     devices = models.ManyToManyField(Device, blank=True)
     security_control = models.ManyToManyField(SecurityControl, blank=True)
-    cpe = models.ManyToManyField(CPE, blank=True)
+
 
     def __str__(self):
         return self.title
