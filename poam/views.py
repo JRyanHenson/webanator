@@ -87,7 +87,7 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                                     vuln_id = VulnId.objects.get(vuln_id=vuln_id.vuln_id)
                                 if Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).exists():
                                     Weakness.objects.filter(system=system, vuln_id=vuln_id).update(comments=comments,
-                                    raw_severity=severity, source_identifying_event=source_id, cci = cci.id,
+                                    raw_severity=severity, source_identifying_event=source_id, cci=cci.id,
                                     source_identifying_tool=source_tool, check_contents=chk_content, fix_text=fix_text,
                                     point_of_contact=PointOfContact.objects.get(name=poc).id, status=status)
                                 else:
@@ -98,6 +98,7 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                                                  'check_contents': chk_content, 'fix_text': fix_text, 'system': system.id,
                                                  'point_of_contact': PointOfContact.objects.get(name=poc).id, 'devices': device}
                                     form = WeaknessModelForm(data_dict)
+                                    print(form)
                                     try:
                                         form.save()
                                     except:
@@ -269,9 +270,9 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                     messages.error(self.request, 'Wrong File Type, Zac!')
                     return redirect(reverse("poam:upload-artifact"))
             # want to close nessus weakness from previous scans on this device
-            if Weakness.objects.exclude(system=system, source_identifying_date=source_date).exists():
-                messages.success(self.request, 'Credentialed Scan: {} Would you like to close previous ACAS scan results for this device?'.format(credentialed_scan))
-                Weakness.objects.exclude(system=system, source_identifying_date=source_date).update(status='closed')
+            # if Weakness.objects.exclude(system=system, source_identifying_date=source_date).exists():
+            #     messages.success(self.request, 'Credentialed Scan: {} Would you like to close previous ACAS scan results for this device?'.format(credentialed_scan))
+            #     Weakness.objects.exclude(system=system, source_identifying_date=source_date).update(status='closed')
             messages.success(self.request, 'Artifacts Uploaded Successfully!')
             return redirect(reverse('poam:edit-system', kwargs={'pk': self.kwargs['pk']}))
 
@@ -377,12 +378,7 @@ class ExportSystemView(LoginRequiredMixin, generic.DetailView):
                 raw_severity = poam.raw_severity
 
             ws['B{}'.format(row)] = raw_severity
-
-            sc = ''
-            security_controls = poam.security_control.all()
-            for security_control in security_controls:
-                sc += '{}'.format(security_control.control_number)
-            ws['C{}'.format(row)] = sc
+            ws['C{}'.format(row)] = poam.cci.sc
             ws['D{}'.format(row)] = poam.mitigated_severity
             ws['E{}'.format(row)] = poam.mitigation
 

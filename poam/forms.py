@@ -22,7 +22,7 @@ class WeaknessModelForm(ModelForm):
 
     class Meta:
         model = Weakness
-        exclude = ['cci']
+        exclude = "__all__"
 
 
 class DeviceForm(ModelForm):
