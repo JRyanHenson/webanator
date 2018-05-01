@@ -78,42 +78,32 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                             fix_text = vuln[9][1].text
                             cci = vuln[24][1].text
                             vuln_id = vuln[0][1].text
-                            security_control = vuln[7][1].text
-                            try:
-                                vuln_id = VulnId(vuln_id=vuln_id)
-                                vuln_id.save()
-                            except IntegrityError:
-                                vuln_id = VulnId.objects.get(vuln_id=vuln_id)
-                            cci = CCI.objects.get(cci=cci)
-                            if Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).exists():
-                                Weakness.objects.filter(system=system, vuln_id=vuln_id).update(comments=comments,
-                                raw_severity=severity, source_identifying_event=source_id, cci=cci,
-                                source_identifying_tool=source_tool, check_contents=chk_content, fix_text=fix_text,
-                                point_of_contact=PointOfContact.objects.get(name=poc), status=status, security_control=security_control)
-                            else:
-                                if status == 'Open':
+                            if status == 'Open':
+                                cci = CCI.objects.get(cci=cci)
+                                try:
+                                    vuln_id = VulnId(vuln_id=vuln_id)
+                                    vuln_id.save()
+                                except IntegrityError:
+                                    vuln_id = VulnId.objects.get(vuln_id=vuln_id.vuln_id)
+                                if Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).exists():
+                                    Weakness.objects.filter(system=system, vuln_id=vuln_id).update(comments=comments,
+                                    raw_severity=severity, source_identifying_event=source_id, cci = cci.id,
+                                    source_identifying_tool=source_tool, check_contents=chk_content, fix_text=fix_text,
+                                    point_of_contact=PointOfContact.objects.get(name=poc).id, status=status)
+                                else:
                                     data_dict = {'title': title, 'description': description, 'status': status,
                                                  'comments': comments, 'raw_severity': severity, 'source_identifying_event': source_id,
                                                  'source_identifying_tool': source_tool, 'source_identifying_date': source_date,
-                                                 'cci': cci, 'vuln_id': vuln_id.id,
+                                                 'cci': cci.id, 'vuln_id': vuln_id.id,
                                                  'check_contents': chk_content, 'fix_text': fix_text, 'system': system.id,
                                                  'point_of_contact': PointOfContact.objects.get(name=poc).id, 'devices': device}
-                                    if security_control is not None:
-                                        try:
-                                            ia_control = SecurityControl(control_number=security_control, title='',
-                                                                         description='')
-                                            ia_control.save()
-                                            ia_control = SecurityControl.objects.filter(id=ia_control.id)
-                                        except IntegrityError:
-                                            ia_control = SecurityControl.objects.filter(control_number=security_control)
-                                        data_dict['security_control'] = ia_control
                                     form = WeaknessModelForm(data_dict)
                                     try:
                                         form.save()
                                     except:
                                         messages.error(self.request, '{} had error when saving to database. {}'.format(vuln_id.vuln_id, form.errors))
-                                else:
-                                    continue
+                            else:
+                                continue
                 else:
                     messages.error(self.request, 'Wrong File Type, Zac!')
                     return redirect(reverse("poam:upload-artifact"))
@@ -258,23 +248,26 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                     messages.error(self.request, 'Wrong File Type, Zac!')
                     weaknessform = WeaknessModelForm()
                     weaknessform.save()
-            # elif file_type == 'cci_list' :
+            elif file_type == 'cci_list' :
             # Used to upload CCI/SecurityControl List. Not needed for regular use.
-            #     tree = ElementTree.parse(data)
-            #     root = tree.getroot()
-            #     if root.tag == "{http://iase.disa.mil/cci}cci_list":
-            #         for child in tree.iter('{http://iase.disa.mil/cci}cci_item'):
-            #             cci = child.get('id')
-            #             definition = child.find('{http://iase.disa.mil/cci}definition').text
-            #             references = child.findall(".//*[@title='NIST SP 800-53 Revision 4']")
-            #             for reference in references:
-            #                 scref = reference.get('index')
-            #                 sc = scref.split(" ")[0]
-            #                 sci_input = CCI(cci=cci, sc=sc, definition=definition, scref=scref)
-            #                 sci_input.save()
-            #     else:
-            #         messages.error(self.request, 'Wrong File Type, Zac!')
-            #         return redirect(reverse("poam:upload-artifact"))
+                tree = ElementTree.parse(data)
+                root = tree.getroot()
+                if root.tag == "{http://iase.disa.mil/cci}cci_list":
+                    for child in tree.iter('{http://iase.disa.mil/cci}cci_item'):
+                        cci = child.get('id')
+                        definition = child.find('{http://iase.disa.mil/cci}definition').text
+                        references = child.findall(".//*[@title='NIST SP 800-53 Revision 4']")
+                        for reference in references:
+                            scref = reference.get('index')
+                            sc = scref.split(" ")[0]
+                            if not CCI.objects.filter(cci=cci).exists():
+                                sci_input = CCI(cci=cci, sc=sc, definition=definition, scref=scref)
+                                sci_input.save()
+                            else:
+                                continue
+                else:
+                    messages.error(self.request, 'Wrong File Type, Zac!')
+                    return redirect(reverse("poam:upload-artifact"))
             # want to close nessus weakness from previous scans on this device
             if Weakness.objects.exclude(system=system, source_identifying_date=source_date).exists():
                 messages.success(self.request, 'Credentialed Scan: {} Would you like to close previous ACAS scan results for this device?'.format(credentialed_scan))
