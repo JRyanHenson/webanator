@@ -378,7 +378,7 @@ class ExportSystemView(LoginRequiredMixin, generic.DetailView):
                 raw_severity = poam.raw_severity
 
             ws['B{}'.format(row)] = raw_severity
-            ws['C{}'.format(row)] = poam.cci.sc
+            ws['C{}'.format(row)] = poam.cci.scref
             ws['D{}'.format(row)] = poam.mitigated_severity
             ws['E{}'.format(row)] = poam.mitigation
 
