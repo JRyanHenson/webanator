@@ -76,10 +76,18 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                             description = vuln[6][1].text
                             chk_content = vuln[8][1].text
                             fix_text = vuln[9][1].text
-                            cci = vuln[24][1].text
+                            diacap_ia_control = ''
+                            try:
+                                cci = vuln[24][1].text
+                            except:
+                                diacap_ia_control = vuln[7][1].text
+                                continue
                             vuln_id = vuln[0][1].text
                             if status == 'Open':
-                                cci = CCI.objects.get(cci=cci)
+                                try:
+                                    cci = CCI.objects.get(cci=cci)
+                                except:
+                                    continue
                                 try:
                                     vuln_id = VulnId(vuln_id=vuln_id)
                                     vuln_id.save()
@@ -89,16 +97,15 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                                     Weakness.objects.filter(system=system, vuln_id=vuln_id).update(comments=comments,
                                     raw_severity=severity, source_identifying_event=source_id, cci=cci.id,
                                     source_identifying_tool=source_tool, check_contents=chk_content, fix_text=fix_text,
-                                    point_of_contact=PointOfContact.objects.get(name=poc).id, status=status)
+                                    point_of_contact=PointOfContact.objects.get(name=poc).id, status=status, security_control=diacap_ia_control)
                                 else:
                                     data_dict = {'title': title, 'description': description, 'status': status,
                                                  'comments': comments, 'raw_severity': severity, 'source_identifying_event': source_id,
                                                  'source_identifying_tool': source_tool, 'source_identifying_date': source_date,
                                                  'cci': cci.id, 'vuln_id': vuln_id.id,
                                                  'check_contents': chk_content, 'fix_text': fix_text, 'system': system.id,
-                                                 'point_of_contact': PointOfContact.objects.get(name=poc).id, 'devices': device}
+                                                 'point_of_contact': PointOfContact.objects.get(name=poc).id, 'devices': device, 'security_control' : diacap_ia_control}
                                     form = WeaknessModelForm(data_dict)
-                                    print(form)
                                     try:
                                         form.save()
                                     except:
@@ -155,6 +162,7 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                     bios_uid = root.findtext(".//tag[@name='bios-uuid']")
                     cpe = [root.findtext(".//tag[@name='cpe']"), root.findtext(".//tag[@name='cpe-0']"), root.findtext(".//tag[@name='cpe-1']"), root.findtext(".//tag[@name='cpe-2']"), root.findtext(".//tag[@name='cpe-3']"), root.findtext(".//tag[@name='cpe-4']"), root.findtext(".//tag[@name='cpe-5']")]
                     credentialed_scan = root.findtext(".//tag[@name='Credentialed_Scan']")
+                    print(device)
                     for specific_device in device:
                         if not Device.objects.filter(system=system, name=specific_device).exists():
                             messages.error(self.request, 'Woops! One of the devices is not in the database')
@@ -233,7 +241,8 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                                     # if cpe is not None:
                                     #     weakness_data_dict['cpe'] = cpe.id
                                     weaknessform = WeaknessModelForm(weakness_data_dict)
-                                    print(weaknessform)
+                                    print(device)
+                                    print(specific_device)
                                     try:
                                         weaknessform.save()
                                     except:

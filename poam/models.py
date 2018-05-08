@@ -94,12 +94,12 @@ class CPE(models.Model):
 
 class Device(models.Model):
     name = models.CharField(max_length=64)
-    os = models.CharField(max_length=128, blank=True, null=True)
+    os = models.CharField(max_length=256, blank=True, null=True)
     hardware = models.CharField(max_length=64, blank=True, null=True)
     system = models.ForeignKey(System, related_name="devices")
     hostname = models.CharField(max_length=64, blank=True, null=True)
     ip = models.CharField(max_length=32, blank=True, null=True)
-    mac = models.CharField(max_length=128, blank=True, null=True)
+    mac = models.TextField(blank=True, null=True)
     bios_uid = models.CharField(max_length=164, blank=True, null=True)
     netbios_name = models.CharField(max_length=64, blank=True, null=True)
     cpes = models.ManyToManyField(CPE, unique=False, blank=True)
@@ -125,6 +125,7 @@ class Weakness(models.Model):
     cci = models.ForeignKey(CCI, related_name="weaknesses", null=True, blank=True)
     # cpe = models.ForeignKey(CPE, related_name="weaknesses", null=True, blank=True)
     mitigation = models.TextField(blank=True, null=True)
+    security_control = models.TextField(blank=True, null=True)
     resources_required = models.CharField(max_length=16, blank=True, null=True)
     scheduled_completion_date = models.DateField(blank=True, null=True)
     milestone_changes = models.CharField(max_length=16, blank=True, null=True)
@@ -152,7 +153,7 @@ class Weakness(models.Model):
     risk_factor = models.TextField(blank=True, null=True)
     vuln_pub_date = models.TextField(blank=True, null=True)
     devices = models.ManyToManyField(Device, blank=True)
-    security_control = models.ManyToManyField(SecurityControl, blank=True)
+
 
 
     def __str__(self):
