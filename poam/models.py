@@ -131,6 +131,8 @@ class Weakness(models.Model):
     milestone_changes = models.CharField(max_length=16, blank=True, null=True)
     status = models.CharField(max_length=32)
     comments = models.TextField(blank=True, null=True)
+    finding_details = models.TextField(blank=True, null=True)
+    stig_ref = models.TextField(blank=True, null=True)
     raw_severity = models.CharField(max_length=8, blank=True)
     mitigated_severity = models.CharField(max_length=4, blank=True, null=True)
     source_identifying_date = models.DateField(auto_now=False)

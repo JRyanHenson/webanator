@@ -9,7 +9,7 @@ from django.db import IntegrityError
 
 import openpyxl
 import datetime
-import os
+# import os
 
 from .forms import *
 from .models import *
@@ -71,40 +71,44 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                         for vuln in root.findall('.//VULN'):
                             status = vuln.find('STATUS').text
                             comments = vuln.find('COMMENTS').text
+                            finding_details = vuln.find('FINDING_DETAILS').text
                             severity = vuln[1][1].text
                             title = vuln[5][1].text
                             description = vuln[6][1].text
                             chk_content = vuln[8][1].text
                             fix_text = vuln[9][1].text
-                            diacap_ia_control = ''
+                            stig_ref = vuln[22][1].text
+                            vuln_id = vuln[0][1].text
+                            diacap_ia_control = None
                             try:
                                 cci = vuln[24][1].text
+                                print(vuln_id, cci)
+                                cci = CCI.objects.get(cci=cci)
                             except:
                                 diacap_ia_control = vuln[7][1].text
-                                continue
-                            vuln_id = vuln[0][1].text
+                                cci = None
                             if status == 'Open':
-                                try:
-                                    cci = CCI.objects.get(cci=cci)
-                                except:
-                                    continue
+                                # print(vuln_id, cci)
                                 try:
                                     vuln_id = VulnId(vuln_id=vuln_id)
                                     vuln_id.save()
                                 except IntegrityError:
                                     vuln_id = VulnId.objects.get(vuln_id=vuln_id.vuln_id)
                                 if Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).exists():
-                                    Weakness.objects.filter(system=system, vuln_id=vuln_id).update(comments=comments,
-                                    raw_severity=severity, source_identifying_event=source_id, cci=cci.id,
+                                    Weakness.objects.filter(system=system, vuln_id=vuln_id).update(comments=comments, finding_details=finding_details,
+                                    stig_ref=stig_ref, raw_severity=severity, source_identifying_event=source_id,
                                     source_identifying_tool=source_tool, check_contents=chk_content, fix_text=fix_text,
                                     point_of_contact=PointOfContact.objects.get(name=poc).id, status=status, security_control=diacap_ia_control)
+                                    if cci is not None:
+                                        Weakness.objects.filter(system=system, vuln_id=vuln_id).update(cci=cci.id)
                                 else:
                                     data_dict = {'title': title, 'description': description, 'status': status,
-                                                 'comments': comments, 'raw_severity': severity, 'source_identifying_event': source_id,
-                                                 'source_identifying_tool': source_tool, 'source_identifying_date': source_date,
-                                                 'cci': cci.id, 'vuln_id': vuln_id.id,
-                                                 'check_contents': chk_content, 'fix_text': fix_text, 'system': system.id,
-                                                 'point_of_contact': PointOfContact.objects.get(name=poc).id, 'devices': device, 'security_control' : diacap_ia_control}
+                                                 'comments': comments, 'finding_details': finding_details, 'stig_ref': stig_ref,'raw_severity': severity,
+                                                 'source_identifying_event': source_id, 'source_identifying_tool': source_tool, 'source_identifying_date': source_date,
+                                                 'vuln_id': vuln_id.id, 'check_contents': chk_content, 'fix_text': fix_text, 'system': system.id,
+                                                 'point_of_contact': PointOfContact.objects.get(name=poc).id, 'devices': device, 'security_control': diacap_ia_control}
+                                    if cci is not None:
+                                        data_dict['cci'] = cci.id
                                     form = WeaknessModelForm(data_dict)
                                     try:
                                         form.save()
@@ -241,8 +245,6 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                                     # if cpe is not None:
                                     #     weakness_data_dict['cpe'] = cpe.id
                                     weaknessform = WeaknessModelForm(weakness_data_dict)
-                                    print(device)
-                                    print(specific_device)
                                     try:
                                         weaknessform.save()
                                     except:
