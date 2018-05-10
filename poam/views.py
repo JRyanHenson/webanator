@@ -82,7 +82,6 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                             diacap_ia_control = None
                             try:
                                 cci = vuln[24][1].text
-                                print(vuln_id, cci)
                                 cci = CCI.objects.get(cci=cci)
                             except:
                                 diacap_ia_control = vuln[7][1].text
@@ -363,8 +362,8 @@ class ExportSystemView(LoginRequiredMixin, generic.DetailView):
 
         ws['H1'] = self.get_object().system_type
         ws['H3'] = self.get_object().point_of_contact.name
-        ws['H4'] = self.get_object().point_of_contact.phone
-        ws['H5'] = self.get_object().point_of_contact.email
+        ws['H4'] = self.get_object().point_of_contact.email
+        ws['H5'] = self.get_object().point_of_contact.phone
 
         poams = self.get_object().get_weaknesses()
         row = 7
@@ -389,14 +388,17 @@ class ExportSystemView(LoginRequiredMixin, generic.DetailView):
                 raw_severity = poam.raw_severity
 
             ws['B{}'.format(row)] = raw_severity
-            ws['C{}'.format(row)] = poam.cci.scref
+            try:
+                ws['C{}'.format(row)] = poam.cci.scref
+            except AttributeError:
+                ws['C{}'.format(row)] = poam.security_control
             ws['D{}'.format(row)] = poam.mitigated_severity
             ws['E{}'.format(row)] = poam.mitigation
 
             poc = ''
             poc += '{}\n'.format(poam.point_of_contact.name)
             poc += '{}\n'.format(poam.point_of_contact.email)
-            poc += '{}\n'.format(poam.point_of_contact.phone)
+            # poc += '{}\n'.format(poam.point_of_contact.phone)
 
             ws['F{}'.format(row)] = poc
             ws['G{}'.format(row)] = poam.resources_required
@@ -405,12 +407,19 @@ class ExportSystemView(LoginRequiredMixin, generic.DetailView):
 
             source_identifying_weakness = ''
             source_identifying_weakness += '1. {}\n'.format(poam.source_identifying_event)
-            source_identifying_weakness += '2. {}\n'.format(poam.source_identifying_tool)
+            if poam.stig_ref is not None:
+                source_identifying_weakness += '2. {}\n'.format(poam.stig_ref)
+            else:
+                source_identifying_weakness += '2. {}\n'.format(poam.source_identifying_tool)
             source_identifying_weakness += '3. {}\n'.format(poam.source_identifying_date)
+
+            comments = ''
+            comments += 'Comments:  {}\n'.format(poam.comments)
+            comments += 'Finding Details:  {}\n'.format(poam.finding_details)
 
             ws['J{}'.format(row)] = source_identifying_weakness
             ws['K{}'.format(row)] = poam.status
-            ws['L{}'.format(row)] = poam.comments
+            ws['L{}'.format(row)] = comments
             row += 1
 
         filename = '{}_{}.xlsx'.format(datetime.date.today(), self.get_object().name)
