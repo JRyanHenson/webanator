@@ -77,6 +77,7 @@ class System(models.Model):
 
 class VulnId(models.Model):
     vuln_id = models.CharField(max_length=8, unique=True)
+    devices = models.ManyToManyField('Device', blank=True)
 
     class Meta:
         db_table = 'vuln_id'
@@ -104,6 +105,7 @@ class Device(models.Model):
     bios_uid = models.CharField(max_length=164, blank=True, null=True)
     netbios_name = models.CharField(max_length=64, blank=True, null=True)
     cpes = models.ManyToManyField(CPE, unique=False, blank=True)
+
 
     def __str__(self):
         return self.name
@@ -155,7 +157,6 @@ class Weakness(models.Model):
     cve = models.TextField(blank=True, null=True)
     risk_factor = models.TextField(blank=True, null=True)
     vuln_pub_date = models.TextField(blank=True, null=True)
-    devices = models.ManyToManyField(Device, blank=True)
 
 
 

@@ -20,11 +20,17 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
     template_name = 'poam/upload_artifact.html'
     model = Weakness
     form_class = DocumentForm
+    form_class2 = DevicesForm
 
-    def get(self, request, *args, **kwargs):
+    def get_context_data(self, **kwargs):
+        context = super(UploadArtifactView, self).get_context_data(**kwargs)
         system = System.objects.get(id=self.kwargs['pk'])
-        form = self.form_class(initial=self.initial, system=system)
-        return render(request, self.template_name, {'form': form, 'system': system})
+        context['system'] = system
+        if 'docform' not in context:
+            context['docform'] = self.form_class(initial=self.initial, system=system)
+        if 'deviceform' not in context:
+            context['deviceform'] = self.form_class2(initial=self.initial, system=system)
+        return context
 
     def get_form_kwargs(self):
         kwargs = super(UploadArtifactView, self).get_form_kwargs()
@@ -449,7 +455,7 @@ class ExportHwSwView(LoginRequiredMixin, generic.DetailView):
         hwsw = self.get_object().get_devices()
         row = 2
         for hwsw in hwsw:
-            ws['A{}'.format(row)] = hwsw.id
+            ws['A{}'.format(row)] = hwsw.name
             ws['B{}'.format(row)] = hwsw.type
             ws['C{}'.format(row)] = hwsw.hardware
             ws['D{}'.format(row)] = hwsw.hostname
