@@ -15,5 +15,7 @@
     <a href="{% url 'poam:upload-artifact' system.id %}">Upload Artifacts</a><br>
     <a href="{% url 'poam:add-device' system.id %}">Add Device</a><br>
     <a href="{% url 'poam:select-device' system.id %}">Edit Devices</a><br>
-    <a href="{% url 'poam:export-system' system.id %}">Export System</a>
+    <a href="{% url 'poam:export-poam' system.id %}">Export POA&M</a><br>
+    <a href="{% url 'poam:export-hw-sw-list' system.id %}">Export HW/SW List</a>
+
 {% endblock %}

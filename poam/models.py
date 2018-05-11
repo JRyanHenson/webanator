@@ -98,6 +98,7 @@ class Device(models.Model):
     hardware = models.CharField(max_length=64, blank=True, null=True)
     system = models.ForeignKey(System, related_name="devices")
     hostname = models.CharField(max_length=64, blank=True, null=True)
+    type = models.CharField(max_length=128, blank=True, null=True)
     ip = models.CharField(max_length=32, blank=True, null=True)
     mac = models.TextField(blank=True, null=True)
     bios_uid = models.CharField(max_length=164, blank=True, null=True)
@@ -111,9 +112,9 @@ class Device(models.Model):
         db_table = 'device'
         unique_together = ('name', 'system')
 
-    def get_systems(self):
+    def get_devices(self):
         '''Get all systems'''
-        return self.systems.all()
+        return self.get_devices().all()
 
 
 class Weakness(models.Model):

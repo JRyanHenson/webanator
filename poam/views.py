@@ -346,7 +346,7 @@ class AddDeviceView(LoginRequiredMixin, generic.CreateView):
         return redirect(reverse('poam:edit-system', kwargs={'pk': self.kwargs['pk']}))
 
 
-class ExportSystemView(LoginRequiredMixin, generic.DetailView):
+class ExportPoamView(LoginRequiredMixin, generic.DetailView):
     template_name = 'poam/edit-system.html'
     model = System
 
@@ -408,18 +408,57 @@ class ExportSystemView(LoginRequiredMixin, generic.DetailView):
             source_identifying_weakness = ''
             source_identifying_weakness += '1. {}\n'.format(poam.source_identifying_event)
             if poam.stig_ref is not None:
-                source_identifying_weakness += '2. {}\n'.format(poam.stig_ref)
+                source_identifying_weakness += '2. {}\nSTIG: '.format(poam.stig_ref)
             else:
                 source_identifying_weakness += '2. {}\n'.format(poam.source_identifying_tool)
             source_identifying_weakness += '3. {}\n'.format(poam.source_identifying_date)
 
             comments = ''
             comments += 'Comments:  {}\n'.format(poam.comments)
-            comments += 'Finding Details:  {}\n'.format(poam.finding_details)
+            comments += '\nFinding Details:  {}\n'.format(poam.finding_details)
+            comments += '\nCVSS Scores:  \n'
+            comments += 'CVSS2 Base Score - {}\n'.format(poam.cvss_base_score)
+            comments += 'CVSS2 Temporal Score - {}\n'.format(poam.cvss_temporal_score)
+            comments += 'CVSS2 Vector - {}\n'.format(poam.cvss_vector)
+            comments += 'CVSS2 Temporal Vector - {}\n'.format(poam.cvss_temporal_score)
+            comments += 'CVSS3 Base Score - {}\n'.format(poam.cvss3_base_score)
+            comments += 'CVSS3 Vector - {}\n'.format(poam.cvss3_vector)
 
             ws['J{}'.format(row)] = source_identifying_weakness
             ws['K{}'.format(row)] = poam.status
             ws['L{}'.format(row)] = comments
+            row += 1
+
+        filename = '{}_{}.xlsx'.format(datetime.date.today(), self.get_object().name)
+        fp.save('{}/poam/{}'.format(settings.MEDIA_ROOT, filename))
+
+        fp = openpyxl.load_workbook('{}/poam/{}'.format(settings.MEDIA_ROOT, filename))
+        httpresponse = HttpResponse(openpyxl.writer.excel.save_virtual_workbook(fp), content_type='application/vnd.ms-excel')
+        httpresponse['Content-Disposition'] = 'attachment; filename={}'.format(filename)
+        return httpresponse
+
+
+class ExportHwSwView(LoginRequiredMixin, generic.DetailView):
+    template_name = 'poam/edit-system.html'
+    model = System
+
+    def get(self, request, *args, **kwargs):
+        fp = openpyxl.load_workbook('{}/template2.xlsx'.format(settings.MEDIA_ROOT))
+        ws = fp['baseline']
+
+        hwsw = self.get_object().get_devices()
+        row = 2
+        for hwsw in hwsw:
+            ws['A{}'.format(row)] = hwsw.id
+            ws['B{}'.format(row)] = hwsw.type
+            ws['C{}'.format(row)] = hwsw.hardware
+            ws['D{}'.format(row)] = hwsw.hostname
+            ws['E{}'.format(row)] = hwsw.ip
+            ws['F{}'.format(row)] = hwsw.os
+            software = ''
+            for cpe in hwsw.cpes.filter(device=hwsw.id):
+                software += '{}\n'.format(cpe.cpe)
+            ws['G{}'.format(row)] = software
             row += 1
 
         filename = '{}_{}.xlsx'.format(datetime.date.today(), self.get_object().name)
