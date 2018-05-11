@@ -61,5 +61,5 @@ class DocumentForm(forms.Form, ModelForm):
         super(DocumentForm, self).__init__(*args, **kwargs)
         self.fields['system'].required = True
         self.fields['system'].initial = system
-        self.fields['device'].queryset = Device.objects.filter(system=system)
+        self.fields['device'].queryset = Device.objects.filter(system=system).order_by('name')
         self.fields['device'].required = False

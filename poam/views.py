@@ -160,96 +160,88 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                     bios_uid = root.findtext(".//tag[@name='bios-uuid']")
                     cpe = [root.findtext(".//tag[@name='cpe']"), root.findtext(".//tag[@name='cpe-0']"), root.findtext(".//tag[@name='cpe-1']"), root.findtext(".//tag[@name='cpe-2']"), root.findtext(".//tag[@name='cpe-3']"), root.findtext(".//tag[@name='cpe-4']"), root.findtext(".//tag[@name='cpe-5']")]
                     credentialed_scan = root.findtext(".//tag[@name='Credentialed_Scan']")
-                    print(device)
-                    for specific_device in device:
-                        if not Device.objects.filter(system=system, name=specific_device).exists():
-                            messages.error(self.request, 'Woops! One of the devices is not in the database')
-                            break
-                        else:
-                            Device.objects.filter(system=system, name=specific_device).update(os=os, ip=ip, hostname=hostname, netbios_name=netbios_name, mac=mac, bios_uid=bios_uid)
-                        # for loop of nessus xml file to get relevant weakness information
-                        for cpe in cpe:
+                    if not Device.objects.filter(system=system, name=device).exists():
+                        messages.error(self.request, 'Woops! One of the devices is not in the database')
+                        break
+                    else:
+                        Device.objects.filter(system=system, name=device).update(os=os, ip=ip, hostname=hostname, netbios_name=netbios_name, mac=mac, bios_uid=bios_uid)
+                    # for loop of nessus xml file to get relevant weakness information
+                    for cpe in cpe:
+                        if cpe is not None:
+                            try:
+                                cpe = CPE(cpe=cpe)
+                                cpe.save()
+                            except IntegrityError:
+                                cpe = CPE.objects.get(cpe=cpe.cpe)
+                            if not Device.objects.filter(system=system, name=device, cpes=cpe.id).exists():
+                                device = Device.objects.get(system=system, name=device)
+                                device.cpes.add(cpe)
+                                device.save()
+                    for vuln in tree.iter('ReportItem'):
+                        vuln_id = vuln.get('pluginID')
+                        severity = vuln.get('severity')
+                        description = vuln.findtext('description')
+                        title = vuln.get('pluginName')
+                        plugin_family = vuln.get('pluginFamily')
+                        plugin_output = vuln.findtext('plugin_output')
+                        fix_text = vuln.findtext('solution')
+                        synopsis = vuln.findtext('synopsis')
+                        status = 'open'
+                        cvss_base_score = vuln.findtext('cvss_base_score')
+                        cvss_temporal_score = vuln.findtext('cvss_temporal_score')
+                        cvss_vector = vuln.findtext('cvss_vector')
+                        cvss_temporal_vector = vuln.findtext('cvss_temporal_vector')
+                        cvss3_base_score = vuln.findtext('cvss3_base_score')
+                        cvss3_vector = vuln.findtext('cvss3_vector')
+                        exploit_available = vuln.findtext('exploit_available')
+                        cpe = vuln.findtext('cpe')
+                        cve = vuln.findtext('cve')
+                        risk_factor = vuln.findtext('risk_factor')
+                        vuln_pub_date = vuln.findtext('vuln_publication_date')
+                        # try block to test to see if vuln_id already exists in DB. if not, creates object
+                        if severity != '0':
                             if cpe is not None:
                                 try:
                                     cpe = CPE(cpe=cpe)
                                     cpe.save()
                                 except IntegrityError:
                                     cpe = CPE.objects.get(cpe=cpe.cpe)
-                                if not Device.objects.filter(system=system, name=specific_device, cpes=cpe.id).exists():
-                                    device = Device.objects.get(system=system, name=specific_device)
+                                if not Device.objects.filter(system=system, name=device, cpes=cpe.id).exists():
+                                    device = Device.objects.get(system=system, name=device)
                                     device.cpes.add(cpe)
                                     device.save()
-                        for vuln in tree.iter('ReportItem'):
-                            vuln_id = vuln.get('pluginID')
-                            severity = vuln.get('severity')
-                            description = vuln.findtext('description')
-                            title = vuln.get('pluginName')
-                            plugin_family = vuln.get('pluginFamily')
-                            plugin_output = vuln.findtext('plugin_output')
-                            fix_text = vuln.findtext('solution')
-                            synopsis = vuln.findtext('synopsis')
-                            status = 'open'
-                            cvss_base_score = vuln.findtext('cvss_base_score')
-                            cvss_temporal_score = vuln.findtext('cvss_temporal_score')
-                            cvss_vector = vuln.findtext('cvss_vector')
-                            cvss_temporal_vector = vuln.findtext('cvss_temporal_vector')
-                            cvss3_base_score = vuln.findtext('cvss3_base_score')
-                            cvss3_vector = vuln.findtext('cvss3_vector')
-                            exploit_available = vuln.findtext('exploit_available')
-                            cpe = vuln.findtext('cpe')
-                            cve = vuln.findtext('cve')
-                            risk_factor = vuln.findtext('risk_factor')
-                            vuln_pub_date = vuln.findtext('vuln_publication_date')
-                            # try block to test to see if vuln_id already exists in DB. if not, creates object
-                            if severity != '0':
-                                try:
-                                    vuln_id = VulnId(vuln_id=vuln_id)
-                                    vuln_id.save()
-                                except IntegrityError:
-                                    vuln_id = vuln.get('pluginID')
-                                    vuln_id = VulnId.objects.get(vuln_id=vuln_id)
-                                if cpe is not None:
-                                    try:
-                                        cpe = CPE(cpe=cpe)
-                                        cpe.save()
-                                    except IntegrityError:
-                                        cpe = CPE.objects.get(cpe=cpe.cpe)
-                                    if not Device.objects.filter(system=system, name=specific_device, cpes=cpe.id).exists():
-                                        device = Device.objects.get(system=system, name=specific_device)
-                                        device.cpes.add(cpe)
-                                        device.save()
-                                # checks to see if weakness object with this hostname and vuln id already exists. if so, it updates existing object
-                                if Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).exists():
-                                    Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).update(raw_severity=severity,
-                                     plugin_family=plugin_family, synopsis=synopsis, plugin_output=plugin_output,source_identifying_event=source_id, source_identifying_tool=source_tool,
-                                     fix_text=fix_text, point_of_contact=PointOfContact.objects.get(name=poc), status=status, cvss_base_score=cvss_base_score,
-                                     cvss_temporal_score=cvss_temporal_score, cvss_vector=cvss_vector, cvss_temporal_vector=cvss_temporal_vector, cvss3_base_score=cvss3_base_score, cvss3_vector=cvss3_vector,
-                                     cve=cve, risk_factor=risk_factor, vuln_pub_date=vuln_pub_date, exploit_available=exploit_available,
-                                     credentialed_scan=credentialed_scan)
-                                else:
-                                    # if severity is not 0 then create and new weakness object using a data dictionary file
-                                    weakness_data_dict = {'title': title, 'system': system.id, 'description': description, 'status': status,
-                                                 'raw_severity': severity, 'source_identifying_event': source_id, 'source_identifying_date': source_date,
-                                                 'source_identifying_tool': source_tool, 'vuln_id': vuln_id.id, 'fix_text': fix_text, 'devices': device,
-                                                 'point_of_contact' : PointOfContact.objects.get(name=poc).id, 'plugin_family': plugin_family, 'plugin_output': plugin_output,
-                                                 'synopsis': synopsis, 'credentialed_scan': credentialed_scan, 'cvss_base_score': cvss_base_score, 'cvss_vector': cvss_vector,
-                                                 'cvss_temporal_score': cvss_temporal_score, 'cvss_temporal_vector': cvss_temporal_vector,
-                                                 'cvss3_base_score': cvss3_base_score, 'cvss3_vector': cvss3_vector, 'exploit_available': exploit_available, 'cve': cve, 'risk_factor': risk_factor,
-                                                 'vuln_pub_date': vuln_pub_date}
-                                    # if cpe is not None:
-                                    #     weakness_data_dict['cpe'] = cpe.id
-                                    weaknessform = WeaknessModelForm(weakness_data_dict)
-                                    try:
-                                        weaknessform.save()
-                                    except:
-                                        messages.error(self.request, '{} had error when saving to database. {}'.format(vuln_id.vuln_id, form.errors))
+                            # checks to see if weakness object with this hostname and vuln id already exists. if so, it updates existing object
+                            if Weakness.objects.filter(device__id=device.id, vuln_id=vuln_id).exists():
+                                Weakness.objects.filter(device__id=device.id, vuln_id=vuln_id).update(raw_severity=severity,
+                                 plugin_family=plugin_family, synopsis=synopsis, plugin_output=plugin_output,source_identifying_event=source_id, source_identifying_tool=source_tool,
+                                 fix_text=fix_text, point_of_contact=PointOfContact.objects.get(name=poc), status=status, cvss_base_score=cvss_base_score,
+                                 cvss_temporal_score=cvss_temporal_score, cvss_vector=cvss_vector, cvss_temporal_vector=cvss_temporal_vector, cvss3_base_score=cvss3_base_score, cvss3_vector=cvss3_vector,
+                                 cve=cve, risk_factor=risk_factor, vuln_pub_date=vuln_pub_date, exploit_available=exploit_available,
+                                 credentialed_scan=credentialed_scan)
                             else:
-                                continue
-                                        # checks for weakness objects created before the date of the current upload. if date is different,
-                                        # updates weakness object to mark previous results as closed. eventually add logic to get user confirmation
-                                        # if Weakness.objects.exclude(devices__id=specific_device.id, source_identifying_date=source_date).exists():
-                                        #     messages.success(self.request, 'Credentialed Scan: ' + credentialed_scan + ' Previous scan results will be closed')
-                                        #     Weakness.objects.exclude(devices__id=specific_device.id, source_identifying_date=source_date).update(status='closed')
+                                # if severity is not 0 then create and new weakness object using a data dictionary file
+                                weakness_data_dict = {'title': title, 'system': system.id, 'description': description, 'status': status,
+                                             'raw_severity': severity, 'source_identifying_event': source_id, 'source_identifying_date': source_date,
+                                             'source_identifying_tool': source_tool, 'vuln_id': vuln_id, 'fix_text': fix_text, 'device': device.id,
+                                             'point_of_contact' : poc.id, 'plugin_family': plugin_family, 'plugin_output': plugin_output,
+                                             'synopsis': synopsis, 'credentialed_scan': credentialed_scan, 'cvss_base_score': cvss_base_score, 'cvss_vector': cvss_vector,
+                                             'cvss_temporal_score': cvss_temporal_score, 'cvss_temporal_vector': cvss_temporal_vector,
+                                             'cvss3_base_score': cvss3_base_score, 'cvss3_vector': cvss3_vector, 'exploit_available': exploit_available, 'cve': cve, 'risk_factor': risk_factor,
+                                             'vuln_pub_date': vuln_pub_date}
+                                # if cpe is not None:
+                                #     weakness_data_dict['cpe'] = cpe.id
+                                weaknessform = WeaknessModelForm(weakness_data_dict)
+                                try:
+                                    weaknessform.save()
+                                except:
+                                    messages.error(self.request, '{} had error when saving to database. {}'.format(vuln_id.vuln_id, form.errors))
+                        else:
+                            continue
+                                    # checks for weakness objects created before the date of the current upload. if date is different,
+                                    # updates weakness object to mark previous results as closed. eventually add logic to get user confirmation
+                                    # if Weakness.objects.exclude(devices__id=specific_device.id, source_identifying_date=source_date).exists():
+                                    #     messages.success(self.request, 'Credentialed Scan: ' + credentialed_scan + ' Previous scan results will be closed')
+                                    #     Weakness.objects.exclude(devices__id=specific_device.id, source_identifying_date=source_date).update(status='closed')
                 else:
                     messages.error(self.request, 'Wrong File Type, Zac!')
                     weaknessform = WeaknessModelForm()
@@ -365,12 +357,12 @@ class ExportPoamView(LoginRequiredMixin, generic.DetailView):
         for poam in poams:
             weakness = ''
             if poam.vuln_id:
-                weakness += '{}\n'.format(poam.vuln_id.vuln_id)
+                weakness += '{}\n'.format(poam.vuln_id)
             weakness += 'Title:{}\n'.format(poam.title)
             weakness += '\nDescription:{}'.format(poam.description)
             weakness += '\n\nDevices Affected:\n'
-            for device in poam.devices.all():
-                weakness += '{}\n'.format(device.name)
+            weakness += '{}\n'.format(poam.device.name)
+            # for device in poam.device.all():
             ws['A{}'.format(row)] = weakness
 
             if poam.raw_severity.lower() == 'high' or poam.raw_severity.lower() == 'very high' or poam.raw_severity == '1':
