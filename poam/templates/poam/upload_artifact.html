@@ -10,8 +10,7 @@
 
     <div class="">
          <form method="post" enctype="multipart/form-data">
-            {{ docform.as_p }}
-             {{ deviceform.as_p }}
+            {{ form.as_p }}
             {% csrf_token %}
             <button type="submit">Upload</button>
          </form>

@@ -20,17 +20,11 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
     template_name = 'poam/upload_artifact.html'
     model = Weakness
     form_class = DocumentForm
-    form_class2 = DevicesForm
 
-    def get_context_data(self, **kwargs):
-        context = super(UploadArtifactView, self).get_context_data(**kwargs)
+    def get(self, request, *args, **kwargs):
         system = System.objects.get(id=self.kwargs['pk'])
-        context['system'] = system
-        if 'docform' not in context:
-            context['docform'] = self.form_class(initial=self.initial, system=system)
-        if 'deviceform' not in context:
-            context['deviceform'] = self.form_class2(initial=self.initial, system=system)
-        return context
+        form = self.form_class(initial=self.initial, system=system)
+        return render(request, self.template_name, {'form': form, 'system': system})
 
     def get_form_kwargs(self):
         kwargs = super(UploadArtifactView, self).get_form_kwargs()
@@ -38,17 +32,13 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
         return kwargs
 
     def post(self, request, *args, **kwargs):
-        # f = super(UploadArtifactView, self).post(request, *args, **kwargs)
-
         form_class = self.get_form_class()
         form = self.get_form(form_class)
         files = request.FILES.getlist('file')
         if form.is_valid():
-            # print(form.cleaned_data['file'])
             form.cleaned_data['file'] = []
             for f in files:
                 form.cleaned_data['file'].append(f)
-                # print(form.cleaned_data['file'])
             return self.form_valid(form)
         else:
             return self.form_invalid(form)
@@ -60,7 +50,7 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
         system = System.objects.get(id=self.kwargs['pk'])
         poc = form.cleaned_data['point_of_contact']
         file_type = form.cleaned_data['file_type']
-        device = form.cleaned_data['devices']
+        device = form.cleaned_data['device']
         for data in form.cleaned_data['file']:
             # read and parse the file, create a Python dictionary `data_dict` from it
             # start loop here for each Vuln_num in xml upload get Rule_title, Vuln_discuss,
@@ -70,57 +60,56 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                 tree = ElementTree.parse(data)
                 root = tree.getroot()
                 if root.tag == "CHECKLIST":
-                    for specific_device in device:
-                        if not Device.objects.filter(system=system, name=specific_device).exists():
-                            messages.error(self.request, 'Woops! One of the devices is not in the database')
-                            break
-                        for vuln in root.findall('.//VULN'):
-                            status = vuln.find('STATUS').text
-                            comments = vuln.find('COMMENTS').text
-                            finding_details = vuln.find('FINDING_DETAILS').text
-                            severity = vuln[1][1].text
-                            title = vuln[5][1].text
-                            description = vuln[6][1].text
-                            chk_content = vuln[8][1].text
-                            fix_text = vuln[9][1].text
-                            stig_ref = vuln[22][1].text
-                            vuln_id = vuln[0][1].text
-                            diacap_ia_control = None
-                            try:
-                                cci = vuln[24][1].text
-                                cci = CCI.objects.get(cci=cci)
-                            except:
-                                diacap_ia_control = vuln[7][1].text
-                                cci = None
-                            if status == 'Open':
-                                # print(vuln_id, cci)
-                                try:
-                                    vuln_id = VulnId(vuln_id=vuln_id)
-                                    vuln_id.save()
-                                except IntegrityError:
-                                    vuln_id = VulnId.objects.get(vuln_id=vuln_id.vuln_id)
-                                if Weakness.objects.filter(devices__id=specific_device.id, vuln_id=vuln_id).exists():
-                                    Weakness.objects.filter(system=system, vuln_id=vuln_id).update(comments=comments, finding_details=finding_details,
-                                    stig_ref=stig_ref, raw_severity=severity, source_identifying_event=source_id,
-                                    source_identifying_tool=source_tool, check_contents=chk_content, fix_text=fix_text,
-                                    point_of_contact=PointOfContact.objects.get(name=poc).id, status=status, security_control=diacap_ia_control)
-                                    if cci is not None:
-                                        Weakness.objects.filter(system=system, vuln_id=vuln_id).update(cci=cci.id)
-                                else:
-                                    data_dict = {'title': title, 'description': description, 'status': status,
-                                                 'comments': comments, 'finding_details': finding_details, 'stig_ref': stig_ref,'raw_severity': severity,
-                                                 'source_identifying_event': source_id, 'source_identifying_tool': source_tool, 'source_identifying_date': source_date,
-                                                 'vuln_id': vuln_id.id, 'check_contents': chk_content, 'fix_text': fix_text, 'system': system.id,
-                                                 'point_of_contact': PointOfContact.objects.get(name=poc).id, 'devices': device, 'security_control': diacap_ia_control}
-                                    if cci is not None:
-                                        data_dict['cci'] = cci.id
-                                    form = WeaknessModelForm(data_dict)
-                                    try:
-                                        form.save()
-                                    except:
-                                        messages.error(self.request, '{} had error when saving to database. {}'.format(vuln_id.vuln_id, form.errors))
+                    if not Device.objects.filter(system=system, name=device).exists():
+                        messages.error(self.request, 'Woops! One of the devices is not in the database')
+                        break
+                    for vuln in root.findall('.//VULN'):
+                        status = vuln.find('STATUS').text
+                        comments = vuln.find('COMMENTS').text
+                        finding_details = vuln.find('FINDING_DETAILS').text
+                        severity = vuln[1][1].text
+                        title = vuln[5][1].text
+                        description = vuln[6][1].text
+                        chk_content = vuln[8][1].text
+                        fix_text = vuln[9][1].text
+                        stig_ref = vuln[22][1].text
+                        vuln_id = vuln[0][1].text
+                        diacap_ia_control = None
+                        try:
+                            cci = vuln[24][1].text
+                            cci = CCI.objects.get(cci=cci)
+                        except:
+                            diacap_ia_control = vuln[7][1].text
+                            cci = None
+                        if status == 'Open':
+                            # print(vuln_id, cci)
+
+                            # check if vuln_id and device pair exists
+                            # if yes, get weakness related to vuln_id and update
+                            # if not, create vuln_id and device pair, create weakness
+
+                            if Weakness.objects.filter(device__id=device.id, vuln_id=vuln_id).exists():
+                                Weakness.objects.filter(system=system, vuln_id=vuln_id).update(comments=comments, finding_details=finding_details,
+                                stig_ref=stig_ref, raw_severity=severity, source_identifying_event=source_id,
+                                source_identifying_tool=source_tool, check_contents=chk_content, fix_text=fix_text,
+                                point_of_contact=PointOfContact.objects.get(name=poc).id, status=status, security_control=diacap_ia_control)
+                                if cci is not None:
+                                    Weakness.objects.filter(system=system, vuln_id=vuln_id).update(cci=cci.id)
                             else:
-                                continue
+                                data_dict = {'title': title, 'description': description, 'status': status,
+                                             'comments': comments, 'finding_details': finding_details, 'stig_ref': stig_ref,'raw_severity': severity,
+                                             'source_identifying_event': source_id, 'source_identifying_tool': source_tool, 'source_identifying_date': source_date,
+                                             'vuln_id': vuln_id, 'check_contents': chk_content, 'fix_text': fix_text, 'system': system.id,
+                                             'point_of_contact': poc.id, 'device': device.id, 'security_control': diacap_ia_control}
+                                if cci is not None:
+                                    data_dict['cci'] = cci.id
+                                form = WeaknessModelForm(data_dict)
+                                try:
+                                    form.save()
+                                except:
+                                    messages.error(self.request, '{} had error when saving to database. {}'.format(vuln_id, form.errors))
+                        else:
+                            continue
                 else:
                     messages.error(self.request, 'Wrong File Type, Zac!')
                     return redirect(reverse("poam:upload-artifact"))
@@ -289,8 +278,8 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
             # if Weakness.objects.exclude(system=system, source_identifying_date=source_date).exists():
             #     messages.success(self.request, 'Credentialed Scan: {} Would you like to close previous ACAS scan results for this device?'.format(credentialed_scan))
             #     Weakness.objects.exclude(system=system, source_identifying_date=source_date).update(status='closed')
-            messages.success(self.request, 'Artifacts Uploaded Successfully!')
-            return redirect(reverse('poam:edit-system', kwargs={'pk': self.kwargs['pk']}))
+        messages.success(self.request, 'Artifacts Uploaded Successfully!')
+        return redirect(reverse('poam:edit-system', kwargs={'pk': self.kwargs['pk']}))
 
 
 class NewSystemView(LoginRequiredMixin, generic.CreateView):

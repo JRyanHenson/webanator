@@ -29,7 +29,7 @@ class DeviceForm(ModelForm):
 
     class Meta:
         model = Device
-        fields = ['name']
+        fields = ['name', 'type', 'hardware']
 
 
 # class DeviceWeaknessForm(ModelForm):
@@ -51,7 +51,7 @@ class DocumentForm(forms.Form, ModelForm):
 
     class Meta:
         model = Weakness
-        fields = ['system', 'point_of_contact', 'source_identifying_event', 'source_identifying_tool', 'source_identifying_date']
+        fields = ['system', 'point_of_contact', 'source_identifying_event', 'source_identifying_tool', 'source_identifying_date', 'device']
 
         widgets = {
             'source_identifying_date': forms.DateInput(attrs={'type': 'date'}, format=('%Y-%m-%d'))
@@ -61,15 +61,5 @@ class DocumentForm(forms.Form, ModelForm):
         super(DocumentForm, self).__init__(*args, **kwargs)
         self.fields['system'].required = True
         self.fields['system'].initial = system
-
-
-class DevicesForm(forms.Form, ModelForm):
-
-    class Meta:
-        model = VulnId
-        fields = ['devices']
-
-    def __init__(self, system, *args, **kwargs):
-        super(DevicesForm, self).__init__(*args, **kwargs)
-        self.fields['devices'].queryset = Device.objects.filter(system=system)
-        self.fields['devices'].required = False
+        self.fields['device'].queryset = Device.objects.filter(system=system)
+        self.fields['device'].required = False
