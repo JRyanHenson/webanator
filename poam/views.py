@@ -410,7 +410,6 @@ class ExportPoamView(LoginRequiredMixin, generic.DetailView):
             comments += 'CVSS2 Temporal Vector - {}\n'.format(poam.cvss_temporal_score)
             comments += 'CVSS3 Base Score - {}\n'.format(poam.cvss3_base_score)
             comments += 'CVSS3 Vector - {}\n'.format(poam.cvss3_vector)
-
             ws['J{}'.format(row)] = source_identifying_weakness
             ws['K{}'.format(row)] = poam.status
             ws['L{}'.format(row)] = comments
