@@ -50,7 +50,7 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
         system = System.objects.get(id=self.kwargs['pk'])
         poc = form.cleaned_data['point_of_contact']
         file_type = form.cleaned_data['file_type']
-        device = form.cleaned_data['device']
+        device_queryset = form.cleaned_data['devices']
         for data in form.cleaned_data['file']:
             # read and parse the file, create a Python dictionary `data_dict` from it
             # start loop here for each Vuln_num in xml upload get Rule_title, Vuln_discuss,
@@ -60,9 +60,6 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                 tree = ElementTree.parse(data)
                 root = tree.getroot()
                 if root.tag == "CHECKLIST":
-                    if not Device.objects.filter(system=system, name=device).exists():
-                        messages.error(self.request, 'Woops! One of the devices is not in the database')
-                        break
                     for vuln in root.findall('.//VULN'):
                         status = vuln.find('STATUS').text
                         comments = vuln.find('COMMENTS').text
@@ -76,38 +73,42 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                         vuln_id = vuln[0][1].text
                         diacap_ia_control = None
                         try:
+                            vuln_id = VulnId(vuln_id=vuln_id)
+                            vuln_id.save()
+                        except IntegrityError:
+                            vuln_id = VulnId.objects.get(vuln_id=vuln_id.vuln_id)
+                        try:
                             cci = vuln[24][1].text
                             cci = CCI.objects.get(cci=cci)
                         except:
                             diacap_ia_control = vuln[7][1].text
                             cci = None
                         if status == 'Open':
-                            # print(vuln_id, cci)
-
-                            # check if vuln_id and device pair exists
-                            # if yes, get weakness related to vuln_id and update
-                            # if not, create vuln_id and device pair, create weakness
-
-                            if Weakness.objects.filter(device__id=device.id, vuln_id=vuln_id).exists():
-                                Weakness.objects.filter(system=system, vuln_id=vuln_id).update(comments=comments, finding_details=finding_details,
-                                stig_ref=stig_ref, raw_severity=severity, source_identifying_event=source_id,
-                                source_identifying_tool=source_tool, check_contents=chk_content, fix_text=fix_text,
-                                point_of_contact=PointOfContact.objects.get(name=poc).id, status=status, security_control=diacap_ia_control)
-                                if cci is not None:
-                                    Weakness.objects.filter(system=system, vuln_id=vuln_id).update(cci=cci.id)
-                            else:
-                                data_dict = {'title': title, 'description': description, 'status': status,
-                                             'comments': comments, 'finding_details': finding_details, 'stig_ref': stig_ref,'raw_severity': severity,
-                                             'source_identifying_event': source_id, 'source_identifying_tool': source_tool, 'source_identifying_date': source_date,
-                                             'vuln_id': vuln_id, 'check_contents': chk_content, 'fix_text': fix_text, 'system': system.id,
-                                             'point_of_contact': poc.id, 'device': device.id, 'security_control': diacap_ia_control}
-                                if cci is not None:
-                                    data_dict['cci'] = cci.id
-                                form = WeaknessModelForm(data_dict)
-                                try:
-                                    form.save()
-                                except:
-                                    messages.error(self.request, '{} had error when saving to database. {}'.format(vuln_id, form.errors))
+                            for device in device_queryset:
+                                if not Device.objects.filter(system=system, name=device).exists():
+                                    messages.error(self.request, 'Woops! One of the devices is not in the database')
+                                else:
+                                    device = Device.objects.get(system=system, name=device)
+                                    if Weakness.objects.filter(devices__id=device.id, vuln_id=vuln_id.id).exists():
+                                        Weakness.objects.filter(system=system, vuln_id=vuln_id.id).update(comments=comments, finding_details=finding_details,
+                                        stig_ref=stig_ref, raw_severity=severity, source_identifying_event=source_id,
+                                        source_identifying_tool=source_tool, check_contents=chk_content, fix_text=fix_text,
+                                        point_of_contact=PointOfContact.objects.get(name=poc).id, status=status, security_control=diacap_ia_control)
+                                        if cci is not None:
+                                            Weakness.objects.filter(system=system, vuln_id=vuln_id.id).update(cci=cci.id)
+                                    else:
+                                        data_dict = {'title': title, 'description': description, 'status': status,
+                                                     'comments': comments, 'finding_details': finding_details, 'stig_ref': stig_ref,'raw_severity': severity,
+                                                     'source_identifying_event': source_id, 'source_identifying_tool': source_tool, 'source_identifying_date': source_date,
+                                                     'vuln_id': vuln_id.id, 'check_contents': chk_content, 'fix_text': fix_text, 'system': system.id,
+                                                     'point_of_contact': poc.id, 'devices': device_queryset, 'security_control': diacap_ia_control}
+                                        if cci is not None:
+                                            data_dict['cci'] = cci.id
+                                        form = WeaknessModelForm(data_dict)
+                                        try:
+                                            form.save()
+                                        except:
+                                            messages.error(self.request, '{} had error when saving to database. {}'.format(vuln_id, form.errors))
                         else:
                             continue
                 else:
@@ -122,28 +123,41 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                     return redirect(reverse("poam:upload-artifact"))
                 else:
                     for row in range(2, sheet.max_row + 1):
-                        title = sheet['C{}'.format(row)].value
-                        status = sheet['D{}'.format(row)].value
-                        comments = sheet['E{}'.format(row)].value
-                        control_number = sheet['B{}'.format(row)].value
-                        try:
-                            security_control = SecurityControl(title=title, control_number=control_number, description='')
-                            security_control.save()
-                            security_controls = SecurityControl.objects.filter(control_number=control_number)
-                        except IntegrityError:
-                            security_control = SecurityControl.objects.get(control_number=control_number)
-                            security_controls = SecurityControl.objects.filter(control_number=control_number)
-
-                        if Weakness.objects.filter(title=title, security_control__id=security_control.id).exists():
-                            Weakness.objects.filter(title=title, security_control=security_controls).update(status=status, comments=comments, source_identifying_event=source_id, source_identifying_tool=source_tool, devices=device, security_control=security_controls, source_identifying_date=source_date, system=System.objects.get(name=system).id, point_of_contact=PointOfContact.objects.get(name=poc).id)
-                        else:
-                            if status == 'Planned':
-                                data_dict = {'title': title, 'description': '', 'status': status, 'comments': comments, 'source_identifying_event': source_id, 'source_identifying_tool': source_tool, 'devices': device, 'security_control': security_controls, 'source_identifying_date' : source_date, 'system': System.objects.get(name=system).id, 'point_of_contact': PointOfContact.objects.get(name=poc).id}
-                                form = WeaknessModelForm(data_dict)
+                        title = sheet['B{}'.format(row)].value
+                        status = sheet['C{}'.format(row)].value
+                        comments = sheet['D{}'.format(row)].value
+                        control_number = sheet['A{}'.format(row)].value
+                        for device in device_queryset:
+                            if not Device.objects.filter(system=system, name=device).exists():
+                                messages.error(self.request, 'Woops! One of the devices is not in the database')
+                            else:
+                                device = Device.objects.get(system=system, name=device)
+                            if control_number is not None:
                                 try:
-                                    form.save()
-                                except:
-                                    messages.error(self.request, form.errors)
+                                    security_control = SecurityControl(title=title, control_number=control_number, description='')
+                                    security_control.save()
+                                except IntegrityError:
+                                    security_control = SecurityControl.objects.get(control_number=control_number)
+                                    print(security_control.control_number)
+                                try:
+                                    vuln_id = VulnId(vuln_id=security_control.control_number)
+                                    vuln_id.save()
+                                except IntegrityError:
+                                    vuln_id = VulnId.objects.get(vuln_id=security_control.control_number)
+
+                                if Weakness.objects.filter(title=security_control.title, devices=device.id).exists():
+                                    print('hi')
+                                    print(vuln_id.vuln_id)
+                                    Weakness.objects.filter(title=security_control.title, devices=device.id).update(status=status, comments=comments, source_identifying_event=source_id, source_identifying_tool=source_tool, security_control=security_control.control_number, source_identifying_date=source_date, system=System.objects.get(name=system).id, point_of_contact=PointOfContact.objects.get(name=poc).id, vuln_id=vuln_id)
+                                else:
+                                    continue
+                                    # if status == 'Planned':
+                                    #     data_dict = {'title': title, 'description': '', 'status': status, 'comments': comments, 'source_identifying_event': source_id, 'source_identifying_tool': source_tool, 'devices': device_queryset, 'security_control': security_control, 'source_identifying_date' : source_date, 'system': System.objects.get(name=system).id, 'point_of_contact': PointOfContact.objects.get(name=poc).id, 'vuln_id' : security_control}
+                                    #     form = WeaknessModelForm(data_dict)
+                                    #     try:
+                                    #         form.save()
+                                    #     except:
+                                    #         messages.error(self.request, form.errors)
             elif file_type == 'nessus_scan_file':
                 # parse data from nessus file and define as tree then get the root of the xml file
                 tree = ElementTree.parse(data)
@@ -158,15 +172,16 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                     netbios_name = root.findtext(".//tag[@name='netbios-name']")
                     mac = root.findtext(".//tag[@name='mac-address']")
                     bios_uid = root.findtext(".//tag[@name='bios-uuid']")
-                    cpe = [root.findtext(".//tag[@name='cpe']"), root.findtext(".//tag[@name='cpe-0']"), root.findtext(".//tag[@name='cpe-1']"), root.findtext(".//tag[@name='cpe-2']"), root.findtext(".//tag[@name='cpe-3']"), root.findtext(".//tag[@name='cpe-4']"), root.findtext(".//tag[@name='cpe-5']")]
+                    system_cpe = [root.findtext(".//tag[@name='cpe']"), root.findtext(".//tag[@name='cpe-0']"), root.findtext(".//tag[@name='cpe-1']"), root.findtext(".//tag[@name='cpe-2']"), root.findtext(".//tag[@name='cpe-3']"), root.findtext(".//tag[@name='cpe-4']"), root.findtext(".//tag[@name='cpe-5']")]
                     credentialed_scan = root.findtext(".//tag[@name='Credentialed_Scan']")
-                    if not Device.objects.filter(system=system, name=device).exists():
-                        messages.error(self.request, 'Woops! One of the devices is not in the database')
-                        break
-                    else:
-                        Device.objects.filter(system=system, name=device).update(os=os, ip=ip, hostname=hostname, netbios_name=netbios_name, mac=mac, bios_uid=bios_uid)
+                    for device in device_queryset:
+                        if not Device.objects.filter(system=system, name=device).exists():
+                            messages.error(self.request, 'Woops! One of the devices is not in the database')
+                            break
+                        else:
+                            Device.objects.filter(system=system, name=device).update(os=os, ip=ip, hostname=hostname, netbios_name=netbios_name, mac=mac, bios_uid=bios_uid)
                     # for loop of nessus xml file to get relevant weakness information
-                    for cpe in cpe:
+                    for cpe in system_cpe:
                         if cpe is not None:
                             try:
                                 cpe = CPE(cpe=cpe)
@@ -194,25 +209,31 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                         cvss3_base_score = vuln.findtext('cvss3_base_score')
                         cvss3_vector = vuln.findtext('cvss3_vector')
                         exploit_available = vuln.findtext('exploit_available')
-                        cpe = vuln.findtext('cpe')
+                        findings_cpe = vuln.findtext('cpe')
                         cve = vuln.findtext('cve')
                         risk_factor = vuln.findtext('risk_factor')
                         vuln_pub_date = vuln.findtext('vuln_publication_date')
                         # try block to test to see if vuln_id already exists in DB. if not, creates object
+                        if findings_cpe is not None:
+                            try:
+                                findings_cpe = CPE(cpe=findings_cpe)
+                                findings_cpe.save()
+                            except IntegrityError:
+                                findings_cpe = CPE.objects.get(cpe=findings_cpe.cpe)
+                            if not Device.objects.filter(name=device, cpes=findings_cpe.id).exists():
+                                device = Device.objects.get(system=system, name=device)
+                                device.cpes.add(findings_cpe)
+                                device.save()
                         if severity != '0':
-                            if cpe is not None:
-                                try:
-                                    cpe = CPE(cpe=cpe)
-                                    cpe.save()
-                                except IntegrityError:
-                                    cpe = CPE.objects.get(cpe=cpe.cpe)
-                                if not Device.objects.filter(system=system, name=device, cpes=cpe.id).exists():
-                                    device = Device.objects.get(system=system, name=device)
-                                    device.cpes.add(cpe)
-                                    device.save()
+                            try:
+                                vuln_id = VulnId(vuln_id=vuln_id)
+                                vuln_id.save()
+                            except IntegrityError:
+                                vuln_id = vuln.get('pluginID')
+                                vuln_id = VulnId.objects.get(vuln_id=vuln_id)
                             # checks to see if weakness object with this hostname and vuln id already exists. if so, it updates existing object
-                            if Weakness.objects.filter(device__id=device.id, vuln_id=vuln_id).exists():
-                                Weakness.objects.filter(device__id=device.id, vuln_id=vuln_id).update(raw_severity=severity,
+                            if Weakness.objects.filter(devices__id=device.id, vuln_id=vuln_id.id).exists():
+                                Weakness.objects.filter(devices__id=device.id, vuln_id=vuln_id.id).update(raw_severity=severity,
                                  plugin_family=plugin_family, synopsis=synopsis, plugin_output=plugin_output,source_identifying_event=source_id, source_identifying_tool=source_tool,
                                  fix_text=fix_text, point_of_contact=PointOfContact.objects.get(name=poc), status=status, cvss_base_score=cvss_base_score,
                                  cvss_temporal_score=cvss_temporal_score, cvss_vector=cvss_vector, cvss_temporal_vector=cvss_temporal_vector, cvss3_base_score=cvss3_base_score, cvss3_vector=cvss3_vector,
@@ -222,14 +243,12 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                                 # if severity is not 0 then create and new weakness object using a data dictionary file
                                 weakness_data_dict = {'title': title, 'system': system.id, 'description': description, 'status': status,
                                              'raw_severity': severity, 'source_identifying_event': source_id, 'source_identifying_date': source_date,
-                                             'source_identifying_tool': source_tool, 'vuln_id': vuln_id, 'fix_text': fix_text, 'device': device.id,
+                                             'source_identifying_tool': source_tool, 'vuln_id': vuln_id.id, 'fix_text': fix_text, 'devices': device_queryset,
                                              'point_of_contact' : poc.id, 'plugin_family': plugin_family, 'plugin_output': plugin_output,
                                              'synopsis': synopsis, 'credentialed_scan': credentialed_scan, 'cvss_base_score': cvss_base_score, 'cvss_vector': cvss_vector,
                                              'cvss_temporal_score': cvss_temporal_score, 'cvss_temporal_vector': cvss_temporal_vector,
                                              'cvss3_base_score': cvss3_base_score, 'cvss3_vector': cvss3_vector, 'exploit_available': exploit_available, 'cve': cve, 'risk_factor': risk_factor,
                                              'vuln_pub_date': vuln_pub_date}
-                                # if cpe is not None:
-                                #     weakness_data_dict['cpe'] = cpe.id
                                 weaknessform = WeaknessModelForm(weakness_data_dict)
                                 try:
                                     weaknessform.save()
@@ -354,66 +373,73 @@ class ExportPoamView(LoginRequiredMixin, generic.DetailView):
 
         poams = self.get_object().get_weaknesses()
         row = 7
+        vulns = []
         for poam in poams:
-            weakness = ''
-            if poam.vuln_id:
-                weakness += '{}\n'.format(poam.vuln_id)
-            weakness += 'Title:{}\n'.format(poam.title)
-            weakness += '\nDescription:{}'.format(poam.description)
-            weakness += '\n\nDevices Affected:\n'
-            weakness += '{}\n'.format(poam.device.name)
-            # for device in poam.device.all():
-            ws['A{}'.format(row)] = weakness
+            if poam.vuln_id and poam.vuln_id.vuln_id not in vulns:
+                weakness = ''
+                weakness += '{}\n'.format(poam.vuln_id.vuln_id)
+                weakness += 'Title:{}\n'.format(poam.title)
+                weakness += '\nDescription:{}'.format(poam.description)
+                weakness += '\n\nDevices Affected:\n'
+                for weak in Weakness.objects.filter(vuln_id=poam.vuln_id):
+                    for device in Device.objects.filter(weakness=weak.id):
+                        weakness += '{}\n'.format(device.name)
+                ws['A{}'.format(row)] = weakness
 
-            if poam.raw_severity.lower() == 'high' or poam.raw_severity.lower() == 'very high' or poam.raw_severity == '1':
-                raw_severity = 'I'
-            elif poam.raw_severity.lower() == 'medium' or poam.raw_severity == '2':
-                raw_severity = 'II'
-            elif poam.raw_severity.lower() == 'low' or poam.raw_severity == '3' or poam.raw_severity == '4':
-                raw_severity = 'III'
+                if poam.raw_severity.lower() == 'high' or poam.raw_severity.lower() == 'very high' or poam.raw_severity == '1':
+                    raw_severity = 'I'
+                elif poam.raw_severity.lower() == 'medium' or poam.raw_severity == '2':
+                    raw_severity = 'II'
+                elif poam.raw_severity.lower() == 'low' or poam.raw_severity == '3' or poam.raw_severity == '4':
+                    raw_severity = 'III'
+                else:
+                    raw_severity = poam.raw_severity
+
+                ws['B{}'.format(row)] = raw_severity
+                try:
+                    ws['C{}'.format(row)] = poam.cci.scref
+                except AttributeError:
+                    ws['C{}'.format(row)] = poam.security_control
+                ws['D{}'.format(row)] = poam.mitigated_severity
+                ws['E{}'.format(row)] = poam.mitigation
+
+                poc = ''
+                poc += '{}\n'.format(poam.point_of_contact.name)
+                poc += '{}\n'.format(poam.point_of_contact.email)
+                # poc += '{}\n'.format(poam.point_of_contact.phone)
+
+                ws['F{}'.format(row)] = poc
+                ws['G{}'.format(row)] = poam.resources_required
+                ws['H{}'.format(row)] = poam.scheduled_completion_date
+                ws['I{}'.format(row)] = poam.milestone_changes
+
+                source_identifying_weakness = ''
+                source_identifying_weakness += '1. {}\n'.format(poam.source_identifying_event)
+                stig_ref = poam.stig_ref
+                print(stig_ref)
+                if stig_ref is not "":
+                    source_identifying_weakness += '2. {}\n'.format(poam.stig_ref)
+                else:
+                    source_identifying_weakness += '2. {}\n'.format(poam.source_identifying_tool)
+                source_identifying_weakness += '3. {}\n'.format(poam.source_identifying_date)
+
+                comments = ''
+                comments += 'Comments:  {}\n'.format(poam.comments)
+                comments += '\nFinding Details:  {}\n'.format(poam.finding_details)
+                comments += '\nCVSS Scores:  \n'
+                comments += 'CVSS2 Base Score - {}\n'.format(poam.cvss_base_score)
+                comments += 'CVSS2 Temporal Score - {}\n'.format(poam.cvss_temporal_score)
+                comments += 'CVSS2 Vector - {}\n'.format(poam.cvss_vector)
+                comments += 'CVSS2 Temporal Vector - {}\n'.format(poam.cvss_temporal_score)
+                comments += 'CVSS3 Base Score - {}\n'.format(poam.cvss3_base_score)
+                comments += 'CVSS3 Vector - {}\n'.format(poam.cvss3_vector)
+                ws['J{}'.format(row)] = source_identifying_weakness
+                ws['K{}'.format(row)] = poam.status
+                ws['L{}'.format(row)] = comments
+                row += 1
+                vulns.append(poam.vuln_id.vuln_id)
             else:
-                raw_severity = poam.raw_severity
-
-            ws['B{}'.format(row)] = raw_severity
-            try:
-                ws['C{}'.format(row)] = poam.cci.scref
-            except AttributeError:
-                ws['C{}'.format(row)] = poam.security_control
-            ws['D{}'.format(row)] = poam.mitigated_severity
-            ws['E{}'.format(row)] = poam.mitigation
-
-            poc = ''
-            poc += '{}\n'.format(poam.point_of_contact.name)
-            poc += '{}\n'.format(poam.point_of_contact.email)
-            # poc += '{}\n'.format(poam.point_of_contact.phone)
-
-            ws['F{}'.format(row)] = poc
-            ws['G{}'.format(row)] = poam.resources_required
-            ws['H{}'.format(row)] = poam.scheduled_completion_date
-            ws['I{}'.format(row)] = poam.milestone_changes
-
-            source_identifying_weakness = ''
-            source_identifying_weakness += '1. {}\n'.format(poam.source_identifying_event)
-            if poam.stig_ref is not None:
-                source_identifying_weakness += '2. {}\nSTIG: '.format(poam.stig_ref)
-            else:
-                source_identifying_weakness += '2. {}\n'.format(poam.source_identifying_tool)
-            source_identifying_weakness += '3. {}\n'.format(poam.source_identifying_date)
-
-            comments = ''
-            comments += 'Comments:  {}\n'.format(poam.comments)
-            comments += '\nFinding Details:  {}\n'.format(poam.finding_details)
-            comments += '\nCVSS Scores:  \n'
-            comments += 'CVSS2 Base Score - {}\n'.format(poam.cvss_base_score)
-            comments += 'CVSS2 Temporal Score - {}\n'.format(poam.cvss_temporal_score)
-            comments += 'CVSS2 Vector - {}\n'.format(poam.cvss_vector)
-            comments += 'CVSS2 Temporal Vector - {}\n'.format(poam.cvss_temporal_score)
-            comments += 'CVSS3 Base Score - {}\n'.format(poam.cvss3_base_score)
-            comments += 'CVSS3 Vector - {}\n'.format(poam.cvss3_vector)
-            ws['J{}'.format(row)] = source_identifying_weakness
-            ws['K{}'.format(row)] = poam.status
-            ws['L{}'.format(row)] = comments
-            row += 1
+                continue
 
         filename = '{}_{}.xlsx'.format(datetime.date.today(), self.get_object().name)
         fp.save('{}/poam/{}'.format(settings.MEDIA_ROOT, filename))
@@ -442,8 +468,8 @@ class ExportHwSwView(LoginRequiredMixin, generic.DetailView):
             ws['E{}'.format(row)] = hwsw.ip
             ws['F{}'.format(row)] = hwsw.os
             software = ''
-            for cpe in hwsw.cpes.filter(device=hwsw.id):
-                software += '{}\n'.format(cpe.cpe)
+            for cpe in CPE.objects.filter(device=hwsw.id):
+                software += '- {}\n'.format(cpe.cpe)
             ws['G{}'.format(row)] = software
             row += 1
 

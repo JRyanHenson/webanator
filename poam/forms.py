@@ -51,7 +51,7 @@ class DocumentForm(forms.Form, ModelForm):
 
     class Meta:
         model = Weakness
-        fields = ['system', 'point_of_contact', 'source_identifying_event', 'source_identifying_tool', 'source_identifying_date', 'device']
+        fields = ['system', 'point_of_contact', 'source_identifying_event', 'source_identifying_tool', 'source_identifying_date', 'devices']
 
         widgets = {
             'source_identifying_date': forms.DateInput(attrs={'type': 'date'}, format=('%Y-%m-%d'))
@@ -61,5 +61,5 @@ class DocumentForm(forms.Form, ModelForm):
         super(DocumentForm, self).__init__(*args, **kwargs)
         self.fields['system'].required = True
         self.fields['system'].initial = system
-        self.fields['device'].queryset = Device.objects.filter(system=system).order_by('name')
-        self.fields['device'].required = False
+        self.fields['devices'].queryset = Device.objects.filter(system=system).order_by('name')
+        self.fields['devices'].required = False

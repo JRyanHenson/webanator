@@ -75,14 +75,21 @@ class System(models.Model):
         return self.systems.all()
 
 
+class VulnId(models.Model):
+    vuln_id = models.CharField(max_length=16, unique=True)
+
+    class Meta:
+        db_table = 'vuln_id'
+
+
 class CPE(models.Model):
     cpe = models.CharField(max_length=128, unique=True)
     # description = models.TextField()
     # title = models.CharField(max_length=256)
 
     # class Meta:
-    #     db_table = 'security_control'
-    #     unique_together = ('control_number', 'title')
+    #     db_table = 'cpe'
+    #     unique_together = ('device', 'cpe')
 
 
 class Device(models.Model):
@@ -116,7 +123,7 @@ class Weakness(models.Model):
     description = models.TextField(blank=True)
     system = models.ForeignKey(System, related_name="weaknesses")
     point_of_contact = models.ForeignKey(PointOfContact, related_name="weaknesses")
-    vuln_id = models.CharField(max_length=8)
+    vuln_id = models.ForeignKey(VulnId, related_name="weaknesses", null=True, blank=True)
     cci = models.ForeignKey(CCI, related_name="weaknesses", null=True, blank=True)
     # cpe = models.ForeignKey(CPE, related_name="weaknesses", null=True, blank=True)
     mitigation = models.TextField(blank=True, null=True)
@@ -149,7 +156,7 @@ class Weakness(models.Model):
     cve = models.TextField(blank=True, null=True)
     risk_factor = models.TextField(blank=True, null=True)
     vuln_pub_date = models.TextField(blank=True, null=True)
-    device = models.ForeignKey(Device, related_name="devices")
+    devices = models.ManyToManyField(Device, blank=True)
 
     def __str__(self):
         return self.title
