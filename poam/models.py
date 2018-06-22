@@ -156,7 +156,7 @@ class Weakness(models.Model):
     cve = models.TextField(blank=True, null=True)
     risk_factor = models.TextField(blank=True, null=True)
     vuln_pub_date = models.TextField(blank=True, null=True)
-    devices = models.ManyToManyField(Device, blank=True)
+    devices = models.ManyToManyField(Device)
 
     def __str__(self):
         return self.title
@@ -166,6 +166,10 @@ class Weakness(models.Model):
         indexes = [
             models.Index(fields=['vuln_id'])
         ]
+
+    def get_devices(self):
+        '''Get the weakness devices'''
+        return self.devices.all()
 
     def get_weakness_by_vuln_id(self, vuln_id):
         '''Get the weaknesses of a specific vuln'''

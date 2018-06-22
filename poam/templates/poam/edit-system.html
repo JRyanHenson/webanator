@@ -13,6 +13,8 @@
     <br>or<br><br>
 
     <a href="{% url 'poam:upload-artifact' system.id %}">Upload Artifacts</a><br>
+    <a href="{% url 'poam:upload-poam' system.id %}">Upload POAM</a><br>
+    <a href="{% url 'poam:upload-device' system.id %}">Upload Devices</a><br>
     <a href="{% url 'poam:add-device' system.id %}">Add Device</a><br>
     <a href="{% url 'poam:select-device' system.id %}">Edit Devices</a><br>
     <a href="{% url 'poam:export-poam' system.id %}">Export POA&M</a><br>

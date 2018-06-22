@@ -265,26 +265,94 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
                     messages.error(self.request, 'Wrong File Type, Zac!')
                     weaknessform = WeaknessModelForm()
                     weaknessform.save()
-            elif file_type == 'cci_list' :
-            # Used to upload CCI/SecurityControl List. Not needed for regular use.
-                tree = ElementTree.parse(data)
-                root = tree.getroot()
-                if root.tag == "{http://iase.disa.mil/cci}cci_list":
-                    for child in tree.iter('{http://iase.disa.mil/cci}cci_item'):
-                        cci = child.get('id')
-                        definition = child.find('{http://iase.disa.mil/cci}definition').text
-                        references = child.findall(".//*[@title='NIST SP 800-53 Revision 4']")
-                        for reference in references:
-                            scref = reference.get('index')
-                            sc = scref.split(" ")[0]
-                            if not CCI.objects.filter(cci=cci).exists():
-                                sci_input = CCI(cci=cci, sc=sc, definition=definition, scref=scref)
-                                sci_input.save()
-                            else:
-                                continue
-                else:
+            # elif file_type == 'cci_list':
+            # # Used to upload CCI/SecurityControl List. Not needed for regular use.
+            #     tree = ElementTree.parse(data)
+            #     root = tree.getroot()
+            #     if root.tag == "{http://iase.disa.mil/cci}cci_list":
+            #         for child in tree.iter('{http://iase.disa.mil/cci}cci_item'):
+            #             cci = child.get('id')
+            #             definition = child.find('{http://iase.disa.mil/cci}definition').text
+            #             references = child.findall(".//*[@title='NIST SP 800-53 Revision 4']")
+            #             for reference in references:
+            #                 scref = reference.get('index')
+            #                 sc = scref.split(" ")[0]
+            #                 if not CCI.objects.filter(cci=cci).exists():
+            #                     sci_input = CCI(cci=cci, sc=sc, definition=definition, scref=scref)
+            #                     sci_input.save()
+            #                 else:
+            #                     continue
+            #     else:
+            #         messages.error(self.request, 'Wrong File Type, Zac!')
+            #         return redirect(reverse("poam:upload-artifact"))
+            elif file_type == 'poam_format':
+                try:
+                    wb = openpyxl.load_workbook(data)
+                    sheet = wb.active
+                except:
                     messages.error(self.request, 'Wrong File Type, Zac!')
                     return redirect(reverse("poam:upload-artifact"))
+                else:
+                    # system values
+                    system_name = sheet['B4'].value
+                    system_update_date = sheet['B2'].value
+                    system_create_date = sheet['B1'].value
+                    system_dod_component = sheet['B3'].value
+                    system_dod_it_resource_number = sheet['B5'].value
+                    system_type = sheet['H1'].value
+                    system_poc_name = sheet['H3'].value
+                    system_poc_email = sheet['H4'].value
+                    system_poc_phone = sheet['H5'].value
+
+                    # check if point of contact exists in database
+                    # if not, create new one
+                    # if yes, set poc to point of contact
+                    try:
+                        poc = PointOfContact.objects.get(name=system_poc_name)
+                    except PointOfContact.DoesNotExist:
+                        poc = PointOfContact.objects.create(name=system_poc_name, email=system_poc_email, phone=system_poc_phone)
+
+                    # check if system exists in database
+                    # if not, possible form tampering, break
+                    # else, update system information
+                    try:
+                        system = System.objects.get(name=system_name)
+                    except System.DoesNotExist:
+                        messages.error(self.request, 'System names don\'t match! Are you sure you chose the correct system?')
+                        break
+                    else:
+                        System.objects.filter(name=system_name).update(update_date=system_update_date, dod_component=system_dod_component, dod_it_resource_number=system_dod_it_resource_number, system_type=system_type, point_of_contact=poc)
+
+                        system = System.objects.get(name=system_name)
+                        for row in range(7, sheet.max_row + 1):
+                            weakness = sheet['A{}'.format(row)].value
+
+                            # Gets everything before Title: - vuln_id
+                            vuln_id = weakness.split("Title: ")[0]
+                            vuln_id = vuln_id.rstrip()
+
+                            # Gets everything after Title:
+                            weakness = weakness.split("Title: ")[1]
+
+                            # Gets everything before Description: - title
+                            title = weakness.split("Description: ")[0]
+                            title = title.rstrip()
+
+                            # Gets everything after Description
+                            weakness = weakness.split("Description: ")[1]
+
+                            if 'Devices Affected:' in weakness:
+                                # Gets everything after Devices Affected:
+                                devices_affected = weakness.split("Devices Affected:\n")[1]
+                                devices_affected = devices_affected.rstrip()
+                                devices_affected = devices_affected.rsplit('\n')
+
+                                # Gets everything before Devices Affected: - Description
+                                weakness = weakness.split("Devices Affected:")[0]
+                                weakness = weakness.rstrip()
+
+                                #
+
             # want to close nessus weakness from previous scans on this device
             # if Weakness.objects.exclude(system=system, source_identifying_date=source_date).exists():
             #     messages.success(self.request, 'Credentialed Scan: {} Would you like to close previous ACAS scan results for this device?'.format(credentialed_scan))
@@ -378,12 +446,12 @@ class ExportPoamView(LoginRequiredMixin, generic.DetailView):
             if poam.vuln_id and poam.vuln_id.vuln_id not in vulns:
                 weakness = ''
                 weakness += '{}\n'.format(poam.vuln_id.vuln_id)
-                weakness += 'Title:{}\n'.format(poam.title)
-                weakness += '\nDescription:{}'.format(poam.description)
-                weakness += '\n\nDevices Affected:\n'
+                weakness += 'Title: {}\n'.format(poam.title)
+                weakness += '\nDescription: {}'.format(poam.description)
+                weakness += '\n\nDevices Affected:'
                 for weak in Weakness.objects.filter(vuln_id=poam.vuln_id):
                     for device in Device.objects.filter(weakness=weak.id):
-                        weakness += '{}\n'.format(device.name)
+                        weakness += '\n{}'.format(device.name)
                 ws['A{}'.format(row)] = weakness
 
                 if poam.raw_severity.lower() == 'high' or poam.raw_severity.lower() == 'very high' or poam.raw_severity == '1':
@@ -406,7 +474,7 @@ class ExportPoamView(LoginRequiredMixin, generic.DetailView):
                 poc = ''
                 poc += '{}\n'.format(poam.point_of_contact.name)
                 poc += '{}\n'.format(poam.point_of_contact.email)
-                # poc += '{}\n'.format(poam.point_of_contact.phone)
+                poc += '{}\n'.format(poam.point_of_contact.phone)
 
                 ws['F{}'.format(row)] = poc
                 ws['G{}'.format(row)] = poam.resources_required
@@ -430,7 +498,7 @@ class ExportPoamView(LoginRequiredMixin, generic.DetailView):
                 comments += 'CVSS2 Base Score - {}\n'.format(poam.cvss_base_score)
                 comments += 'CVSS2 Temporal Score - {}\n'.format(poam.cvss_temporal_score)
                 comments += 'CVSS2 Vector - {}\n'.format(poam.cvss_vector)
-                comments += 'CVSS2 Temporal Vector - {}\n'.format(poam.cvss_temporal_score)
+                comments += 'CVSS2 Temporal Vector - {}\n'.format(poam.cvss_temporal_vector)
                 comments += 'CVSS3 Base Score - {}\n'.format(poam.cvss3_base_score)
                 comments += 'CVSS3 Vector - {}\n'.format(poam.cvss3_vector)
                 ws['J{}'.format(row)] = source_identifying_weakness
@@ -504,3 +572,182 @@ class EditDeviceView(LoginRequiredMixin, generic.UpdateView):
     def get_success_url(self):
         url = reverse('poam:edit-system', kwargs={'pk': Device.objects.get(id=self.kwargs['pk']).system.id})
         return url
+
+
+class UploadPOAMView(LoginRequiredMixin, generic.UpdateView):
+    template_name = 'poam/upload-poam.html'
+    model = System
+    form_class = POAMForm
+
+    def form_valid(self, form):
+        data = form.cleaned_data['file']
+        chosen_system = form.cleaned_data['name']
+        try:
+            wb = openpyxl.load_workbook(data)
+            sheet = wb.active
+        except:
+            messages.error(self.request, 'Wrong File Type, Zac!')
+            return redirect(reverse("poam:upload-poam", kwargs={'pk': self.kwargs['pk']}))
+        else:
+            create_date = sheet['B1'].value
+            update_date = sheet['B2'].value
+            dod_component = sheet['B3'].value
+            system_name = sheet['B4'].value
+            dod_it_resource_number = sheet['B5'].value
+
+            system_type = sheet['H1'].value
+            poc_name = sheet['H3'].value
+            poc_email = sheet['H4'].value
+            poc_phone = sheet['H5'].value
+
+            if system_name != chosen_system:
+                messages.error(self.request, 'I think you chose the wrong system! Make sure the system name in your file (cell B4) matches exactly')
+                return 0
+
+            try:
+                system = System.objects.get(name=system_name)
+            except System.DoesNotExist:
+                messages.error(self.request, 'Looks like that sysem is not in the database!')
+                return 0
+            else:
+                System.objects.filter(name=system_name).update(update_date=update_date, dod_it_resource_number=dod_it_resource_number)
+                system = System.objects.get(name=system_name)
+
+            for row in range(7, sheet.max_row + 1):
+                if sheet['A{}'.format(row)].value == None:
+                    break
+
+                weakness = sheet['A{}'.format(row)].value
+
+                # Gets everything before Title: - vuln_id
+                vuln_id = weakness.split("Title:")[0]
+                vuln_id = vuln_id.rstrip()
+
+                # Gets everything after Title:
+                weakness = weakness.split("Title:")[1]
+
+                # Gets everything before Description: - title
+                title = weakness.split("Description:")[0]
+                title = title.rstrip()
+
+                # Gets everything after Description
+                weakness = weakness.split("Description:")[1]
+
+                # Gets everything after Devices Affected:
+                devices_affected = weakness.split("Devices Affected:\n")[1]
+                devices_affected = devices_affected.rstrip()
+                devices_affected = devices_affected.rsplit('\n')
+
+                devices = []
+
+                devices_in_db = True
+
+                for device_affected in devices_affected:
+                    try:
+                        Device.objects.get(name=device_affected)
+                    except Device.DoesNotExist:
+                        messages.error(self.request, 'Device {} is not in the database! Please go back and add it before continuing'.format(device_affected))
+                        devices_in_db = False
+                    else:
+                        device = Device.objects.get(name=device_affected)
+                        devices.append(device)
+
+                if not devices_in_db:
+                    break
+
+                # Gets everything before Devices Affected: - Description
+                description = weakness.split("Devices Affected:")[0]
+                description = description.rstrip()
+
+                raw_severity = sheet['B{}'.format(row)].value
+                security_control = sheet['C{}'.format(row)].value
+                mitigated_severity = sheet['D{}'.format(row)].value
+                mitigation = sheet['E{}'.format(row)].value
+                poc = sheet['F{}'.format(row)].value.splitlines()
+                poc_name = poc[0]
+                poc_email = poc[1]
+                # poc_phone = poc[2]
+                try:
+                    point_of_contact = PointOfContact.objects.get(name=poc_name)
+                except PointOfContact.DoesNotExist:
+                    PointOfContact.objects.create(name=poc_name, email=poc_email, phone='')
+                else:
+                    point_of_contact = PointOfContact.objects.get(name=poc_name)
+                resources_required = sheet['G{}'.format(row)].value
+                scheduled_completion_date = sheet['H{}'.format(row)].value
+                milestone_changes = sheet['I{}'.format(row)].value
+                siw = sheet['J{}'.format(row)].value.splitlines()
+                source_identifying_event = siw[0].split('1.')[1]
+                source_identifying_tool = siw[1].split('2.')[1]
+                source_identifying_date = siw[2].split('3.')[1]
+                status = sheet['K{}'.format(row)].value
+
+                comments = sheet['L{}'.format(row)].value.splitlines()
+
+                try:
+                    finding_details = comments[2].split('Finding Details: ')[1]
+                except IndexError:
+                    finding_details = ''
+
+                try:
+                    cvss_base_score = comments[5].split('CVSS2 Base Score - ')[1]
+                except IndexError:
+                    cvss_base_score = ''
+
+                try:
+                    cvss_temporal_score = comments[6].split('CVSS2 Temporal Score - ')[1]
+                except IndexError:
+                    cvss_temporal_score = ''
+
+                try:
+                    cvss_vector = comments[7].split('CVSS2 Vector - ')[1]
+                except IndexError:
+                    cvss_vector = ''
+
+                try:
+                    cvss_temporal_vector = comments[8].split('CVSS2 Temporal Vector - ')[1]
+                except IndexError:
+                    cvss_temporal_vector = ''
+
+                try:
+                    cvss3_base_score = comments[9].split('CVSS3 Base Score - ')[1]
+                except IndexError:
+                    cvss3_base_score = ''
+
+                try:
+                    cvss3_vector = comments[10].split('CVSS3 Vector - ')[1]
+                except IndexError:
+                    cvss3_vector = ''
+
+                try:
+                    comments = comments[0].split('Comments:  ')[1]
+                except IndexError:
+                    comments = ''
+
+                try:
+                    Weakness.objects.get(vuln_id=VulnId.objects.get(vuln_id=vuln_id), system=system)
+                except Weakness.DoesNotExist:
+                    data_dict = {'title': title, 'description': description, 'status': status, 'comments': comments, 'finding_details': finding_details, 'raw_severity': raw_severity, 'source_identifying_event': source_identifying_event, 'source_identifying_tool': source_identifying_tool, 'source_identifying_date': source_identifying_date, 'vuln_id': VulnId.objects.get(vuln_id=vuln_id).id, 'system': system.id, 'point_of_contact': point_of_contact.id, 'devices': devices, 'security_control': security_control, 'mitigated_severity': mitigated_severity, 'mitigation': mitigation, 'resources_required': resources_required, 'scheduled_completion_date': scheduled_completion_date, 'milestone_changes': milestone_changes, 'cvss_base_score': cvss_base_score, 'cvss_temporal_score': cvss_temporal_score, 'cvss_vector': cvss_vector, 'cvss_temporal_vector': cvss_temporal_vector, 'cvss3_base_score': cvss3_base_score, 'cvss3_vector': cvss3_vector}
+                    form = WeaknessModelForm(data_dict)
+                    form.save()
+                else:
+                    Weakness.objects.filter(vuln_id=VulnId.objects.get(vuln_id=vuln_id)).update(security_control=security_control, mitigated_severity=mitigated_severity, mitigation=mitigation, resources_required=resources_required, scheduled_completion_date=scheduled_completion_date, milestone_changes=milestone_changes, status=status, comments=comments)
+
+        return redirect(reverse("poam:upload-poam", kwargs={'pk': self.kwargs['pk']}))
+
+
+class UploadDeviceView(LoginRequiredMixin, generic.CreateView):
+    template_name = 'poam/upload_device.html'
+    model = Device
+    form_class = DeviceUploadForm
+
+    def get_context_data(self, **kwargs):
+        context = super(UploadDeviceView, self).get_context_data(**kwargs)
+        context['system'] = System.objects.get(id=self.kwargs['pk'])
+        return context
+
+    def form_invalid(self, form):
+        print(form.errors)
+
+    def form_valid(self, form):
+        print(form)
