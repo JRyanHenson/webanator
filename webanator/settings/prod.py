@@ -11,13 +11,6 @@ ADMINS = [('Admin', 'admin@colonellevels.net')]
 MANAGERS = [('Admin', 'admin@colonellevels.net')]
 
 
-IGNORABLE_404_URLS = [
-    re.compile(r'^/apple-touch-icon.*\.png$'),
-    re.compile(r'^/favicon\.ico$'),
-    re.compile(r'^/robots\.txt$')
-]
-
-
 # Database
 DATABASES = {
     'default': {
