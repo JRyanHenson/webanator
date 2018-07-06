@@ -3,10 +3,12 @@ from .base import *
 
 DEBUG = False
 
-ALLOWED_HOSTS = ["138.68.227.77"]
+ALLOWED_HOSTS = ["159.89.150.92"]
 
 ADMINS = [('Admin', 'admin@colonellevels.net')]
 MANAGERS = [('Admin', 'admin@colonellevels.net')]
+
+SECRET_KEY = os.environ['SECRET_KEY']
 
 
 IGNORABLE_404_URLS = [
