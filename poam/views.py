@@ -285,73 +285,6 @@ class UploadArtifactView(LoginRequiredMixin, generic.CreateView):
             #     else:
             #         messages.error(self.request, 'Wrong File Type, Zac!')
             #         return redirect(reverse("poam:upload-artifact"))
-            elif file_type == 'poam_format':
-                try:
-                    wb = openpyxl.load_workbook(data)
-                    sheet = wb.active
-                except:
-                    messages.error(self.request, 'Wrong File Type, Zac!')
-                    return redirect(reverse("poam:upload-artifact"))
-                else:
-                    # system values
-                    system_name = sheet['B4'].value
-                    system_update_date = sheet['B2'].value
-                    system_create_date = sheet['B1'].value
-                    system_dod_component = sheet['B3'].value
-                    system_dod_it_resource_number = sheet['B5'].value
-                    system_type = sheet['H1'].value
-                    system_poc_name = sheet['H3'].value
-                    system_poc_email = sheet['H4'].value
-                    system_poc_phone = sheet['H5'].value
-
-                    # check if point of contact exists in database
-                    # if not, create new one
-                    # if yes, set poc to point of contact
-                    try:
-                        poc = PointOfContact.objects.get(name=system_poc_name)
-                    except PointOfContact.DoesNotExist:
-                        poc = PointOfContact.objects.create(name=system_poc_name, email=system_poc_email, phone=system_poc_phone)
-
-                    # check if system exists in database
-                    # if not, possible form tampering, break
-                    # else, update system information
-                    try:
-                        system = System.objects.get(name=system_name)
-                    except System.DoesNotExist:
-                        messages.error(self.request, 'System names don\'t match! Are you sure you chose the correct system?')
-                        break
-                    else:
-                        System.objects.filter(name=system_name).update(update_date=system_update_date, dod_component=system_dod_component, dod_it_resource_number=system_dod_it_resource_number, system_type=system_type, point_of_contact=poc)
-
-                        system = System.objects.get(name=system_name)
-                        for row in range(7, sheet.max_row + 1):
-                            weakness = sheet['A{}'.format(row)].value
-
-                            # Gets everything before Title: - vuln_id
-                            vuln_id = weakness.split("Title: ")[0]
-                            vuln_id = vuln_id.rstrip()
-
-                            # Gets everything after Title:
-                            weakness = weakness.split("Title: ")[1]
-
-                            # Gets everything before Description: - title
-                            title = weakness.split("Description: ")[0]
-                            title = title.rstrip()
-
-                            # Gets everything after Description
-                            weakness = weakness.split("Description: ")[1]
-
-                            if 'Devices Affected:' in weakness:
-                                # Gets everything after Devices Affected:
-                                devices_affected = weakness.split("Devices Affected:\n")[1]
-                                devices_affected = devices_affected.rstrip()
-                                devices_affected = devices_affected.rsplit('\n')
-
-                                # Gets everything before Devices Affected: - Description
-                                weakness = weakness.split("Devices Affected:")[0]
-                                weakness = weakness.rstrip()
-
-                                #
 
             # want to close nessus weakness from previous scans on this device
             # if Weakness.objects.exclude(system=system, source_identifying_date=source_date).exists():
@@ -484,7 +417,6 @@ class ExportPoamView(LoginRequiredMixin, generic.DetailView):
                 source_identifying_weakness = ''
                 source_identifying_weakness += '1. {}\n'.format(poam.source_identifying_event)
                 stig_ref = poam.stig_ref
-                print(stig_ref)
                 if stig_ref is not "":
                     source_identifying_weakness += '2. {}\n'.format(poam.stig_ref)
                 else:
@@ -508,8 +440,8 @@ class ExportPoamView(LoginRequiredMixin, generic.DetailView):
                 vulns.append(poam.vuln_id.vuln_id)
             else:
                 continue
-
         filename = '{}_{}.xlsx'.format(datetime.date.today(), self.get_object().name)
+        print(filename)
         fp.save('{}/poam/{}'.format(settings.MEDIA_ROOT, filename))
 
         fp = openpyxl.load_workbook('{}/poam/{}'.format(settings.MEDIA_ROOT, filename))
@@ -623,6 +555,11 @@ class UploadPOAMView(LoginRequiredMixin, generic.UpdateView):
                 vuln_id = weakness.split("Title:")[0]
                 vuln_id = vuln_id.rstrip()
 
+                try:
+                    vuln_id = VulnId.objects.get(vuln_id=vuln_id)
+                except VulnId.DoesNotExist:
+                    vuln_id = VulnId.objects.create(vuln_id=vuln_id)
+
                 # Gets everything after Title:
                 weakness = weakness.split("Title:")[1]
 
@@ -677,6 +614,7 @@ class UploadPOAMView(LoginRequiredMixin, generic.UpdateView):
                 scheduled_completion_date = sheet['H{}'.format(row)].value
                 milestone_changes = sheet['I{}'.format(row)].value
                 siw = sheet['J{}'.format(row)].value.splitlines()
+                print(siw)
                 source_identifying_event = siw[0].split('1.')[1]
                 source_identifying_tool = siw[1].split('2.')[1]
                 source_identifying_date = siw[2].split('3.')[1]
@@ -725,13 +663,16 @@ class UploadPOAMView(LoginRequiredMixin, generic.UpdateView):
                     comments = ''
 
                 try:
-                    Weakness.objects.get(vuln_id=VulnId.objects.get(vuln_id=vuln_id), system=system)
+                    Weakness.objects.get(vuln_id=vuln_id, system=system)
                 except Weakness.DoesNotExist:
-                    data_dict = {'title': title, 'description': description, 'status': status, 'comments': comments, 'finding_details': finding_details, 'raw_severity': raw_severity, 'source_identifying_event': source_identifying_event, 'source_identifying_tool': source_identifying_tool, 'source_identifying_date': source_identifying_date, 'vuln_id': VulnId.objects.get(vuln_id=vuln_id).id, 'system': system.id, 'point_of_contact': point_of_contact.id, 'devices': devices, 'security_control': security_control, 'mitigated_severity': mitigated_severity, 'mitigation': mitigation, 'resources_required': resources_required, 'scheduled_completion_date': scheduled_completion_date, 'milestone_changes': milestone_changes, 'cvss_base_score': cvss_base_score, 'cvss_temporal_score': cvss_temporal_score, 'cvss_vector': cvss_vector, 'cvss_temporal_vector': cvss_temporal_vector, 'cvss3_base_score': cvss3_base_score, 'cvss3_vector': cvss3_vector}
+                    data_dict = {'title': title, 'description': description, 'status': status, 'comments': comments, 'finding_details': finding_details, 'raw_severity': raw_severity, 'source_identifying_event': source_identifying_event, 'source_identifying_tool': source_identifying_tool, 'source_identifying_date': source_identifying_date, 'vuln_id': vuln_id.id, 'system': system.id, 'point_of_contact': point_of_contact.id, 'devices': devices, 'security_control': security_control, 'mitigated_severity': mitigated_severity, 'mitigation': mitigation, 'resources_required': resources_required, 'scheduled_completion_date': scheduled_completion_date, 'milestone_changes': milestone_changes, 'cvss_base_score': cvss_base_score, 'cvss_temporal_score': cvss_temporal_score, 'cvss_vector': cvss_vector, 'cvss_temporal_vector': cvss_temporal_vector, 'cvss3_base_score': cvss3_base_score, 'cvss3_vector': cvss3_vector}
                     form = WeaknessModelForm(data_dict)
-                    form.save()
+                    try:
+                        form.save()
+                    except:
+                        print(form.errors)
                 else:
-                    Weakness.objects.filter(vuln_id=VulnId.objects.get(vuln_id=vuln_id)).update(security_control=security_control, mitigated_severity=mitigated_severity, mitigation=mitigation, resources_required=resources_required, scheduled_completion_date=scheduled_completion_date, milestone_changes=milestone_changes, status=status, comments=comments)
+                    Weakness.objects.filter(vuln_id=vuln_id).update(security_control=security_control, mitigated_severity=mitigated_severity, mitigation=mitigation, resources_required=resources_required, scheduled_completion_date=scheduled_completion_date, milestone_changes=milestone_changes, status=status, comments=comments)
 
         return redirect(reverse("poam:upload-poam", kwargs={'pk': self.kwargs['pk']}))
 
@@ -746,8 +687,42 @@ class UploadDeviceView(LoginRequiredMixin, generic.CreateView):
         context['system'] = System.objects.get(id=self.kwargs['pk'])
         return context
 
-    def form_invalid(self, form):
-        print(form.errors)
-
     def form_valid(self, form):
-        print(form)
+        data = form.cleaned_data['file']
+        system = System.objects.get(id=self.kwargs['pk'])
+        try:
+            wb = openpyxl.load_workbook(data)
+            sheet = wb.active
+        except:
+            messages.error(self.request, 'Wrong File Type, Zac!')
+            return redirect(reverse("poam:upload-device", kwargs={'pk': self.kwargs['pk']}))
+        else:
+            for row in range(2, sheet.max_row + 1):
+                if sheet['A{}'.format(row)].value == None:
+                    break
+                name = sheet['A{}'.format(row)].value
+                type = sheet['B{}'.format(row)].value
+                hardware = sheet['C{}'.format(row)].value
+                hostname = sheet['D{}'.format(row)].value
+                ip = sheet['E{}'.format(row)].value
+                os = sheet['F{}'.format(row)].value
+                cpes = sheet['G{}'.format(row)].value
+                try:
+                    cpes = cpes.split('- ')
+                except AttributeError:
+                    cpes = ''
+                try:
+                    device = Device(name=name, type=type, hardware=hardware, hostname=hostname, ip=ip, os=os, system=system)
+                    device.save()
+                except IntegrityError:
+                    device = Device.objects.get(name=name, system=system)
+                for cpe in cpes:
+                    if cpe != '':
+                        try:
+                            db_cpe = CPE.objects.get(cpe=cpe)
+                        except CPE.DoesNotExist:
+                            db_cpe = CPE.objects.create(cpe=cpe)
+                        else:
+                            device.cpes.add(db_cpe)
+            messages.success(self.request, 'Devices added successfuly!')
+            return redirect(reverse("poam:upload-device", kwargs={'pk': self.kwargs['pk']}))

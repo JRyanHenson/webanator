@@ -44,8 +44,7 @@ class DocumentForm(forms.Form, forms.ModelForm):
         ('stig_checklist_file','STIG Checklist File'),
         ('nessus_scan_file', 'Nessus Scan File'),
         ('rmf_control_review_file', 'RMF Control Review File'),
-        # ('cci_list', 'Update to CCI List'),
-        ('poam_format', 'POAM Format')
+        # ('cci_list', 'Update to CCI List')
     ]
     file_type = forms.CharField(label='File Type', widget=forms.RadioSelect(choices=FILE_TYPE_CHOICES))
 
@@ -82,8 +81,4 @@ class DeviceUploadForm(forms.ModelForm):
 
     class Meta:
         model = System
-        fields = ['name', 'file']
-
-        widgets = {
-            'name': forms.HiddenInput()
-        }
+        fields = ['file',]

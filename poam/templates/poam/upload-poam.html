@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 
-{% block title %}Upload POAM{% endblock %}
+{% block title %}Upload POA&M{% endblock %}
 
 {% block content %}
-    <h1>Upload POAM</h1>
+    <h1>Upload POA&M</h1>
     {% if form.errors %}
         <p>There was an error creating your system</p>
     {% endif %}
@@ -14,7 +14,8 @@
             {{ form.as_p }}
             {% csrf_token %}
             <button type="submit">Upload</button>
-         </form>
+        </form><br>
+         <a href="{% url 'poam:edit-system' system.id %}">Edit System</a>
     </div>
 
 {% endblock %}

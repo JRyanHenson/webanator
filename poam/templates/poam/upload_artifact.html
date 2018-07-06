@@ -15,7 +15,8 @@
             <button type="submit">Upload</button>
          </form>
          <br><br>
-         <a href="{% url 'poam:add-device' system.id %}">Device not listed?</a>
+         <a href="{% url 'poam:add-device' system.id %}">Device not listed?</a><br>
+         <a href="{% url 'poam:edit-system' system.id %}">Edit System</a>
     </div>
 
 {% endblock %}

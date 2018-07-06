@@ -139,7 +139,7 @@ class Weakness(models.Model):
     mitigated_severity = models.CharField(max_length=4, blank=True, null=True)
     source_identifying_date = models.DateField(auto_now=False)
     source_identifying_event = models.CharField(max_length=32)
-    source_identifying_tool = models.CharField(max_length=32)
+    source_identifying_tool = models.CharField(max_length=256)
     check_contents = models.TextField(blank=True, null=True)
     fix_text = models.TextField(blank=True, null=True)
     plugin_family = models.TextField(blank=True, null=True)
